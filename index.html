@@ -1251,7 +1251,7 @@ html{ -webkit-text-size-adjust:100%; text-size-adjust:100% }
    ส่วนที่ 1 · ค่าคงที่ และเครื่องมือพื้นฐาน
 ============================================================================ */
 
-var APP_VERSION = '2.9';
+var APP_VERSION = '3.0';
 
 /* โลโก้ Seacon Bangkae ฝังเป็น data URL — ไฟล์เดียวจบ ไม่ต้องแนบรูปแยก
    มี 2 ชุด: ชุดสีเดิมสำหรับพื้นสว่าง/รายงาน และชุดตัวอักษรสีขาวสำหรับพื้นมืด */
@@ -1464,6 +1464,28 @@ function floorRank(f){
 function shortGate(n){
   return String(n).replace(/^ประต[ุู]\s*/,'').replace(/\s*(?:ชั้น|ขั้น)\.?\s*/,' ช.').trim() || n;
 }
+/* ป้ายช่วงชั่วโมง เช่น "18:00–19:00"
+   ต้องอ่านชั่วโมงถัดไปจากตารางจริง ไม่ใช่บวก 1 เอา
+   เพราะตารางลูกค้าจบที่ 24 การบวก 1 จะได้ป้าย "25:00" ซึ่งไม่มีอยู่จริง
+   และถ้าวันหนึ่งตารางไม่ได้เรียงต่อเนื่อง การบวกเลขก็จะผิดทั้งหมด */
+/* คีย์ของสัปดาห์ (วันจันทร์ต้นสัปดาห์ตามธรรมเนียมไทย)
+   toDate() คืน null ได้เมื่อวันที่ไม่ถูกรูปแบบ การเรียก .setDate() ต่อทันที
+   จะโยน TypeError แล้วทั้งหน้าจอกลายเป็นการ์ด "แสดงผลหน้านี้ไม่สำเร็จ"
+   ทั้งที่ข้อมูลวันอื่นยังดีอยู่ — ถอยไปใช้ค่าวันนั้นตรง ๆ ปลอดภัยกว่า */
+function weekKeyOf(iso){
+  var dt = toDate(iso);
+  if(!dt || isNaN(dt.getTime())) return String(iso || '');
+  dt.setDate(dt.getDate() - ((dt.getDay()+6)%7));
+  var k = isoOf(dt);
+  return k || String(iso || '');
+}
+function hourSpanLabel(grid, i){
+  if(!grid || i==null || i<0 || i>=grid.length) return '—';
+  var a = grid[i];
+  var b = (i+1 < grid.length) ? grid[i+1] : (a>=24 ? 24 : a+1);
+  if(b === a) return hourLabel(a);
+  return hourLabel(a)+'–'+hourLabel(b);
+}
 function bareGate(n){
   return String(n).replace(/^ประต[ุู]\s*/,'').replace(/\s*(?:ชั้น|ขั้น)\.?\s*\S*$/,'').trim() || n;
 }
@@ -1513,9 +1535,26 @@ function gateKey(n){
   var out = raw, rules = gateMergeRules();
   for(var i=0;i<rules.length;i++){
     var r = rules[i], hit = false, list = r.match || [];
-    for(var j=0;j<list.length;j++){
+
+    /* รายการ exact = คีย์เต็มของชื่อที่ผู้ใช้เลือกจับคู่เอง ต้องเทียบแบบ "ตรงทั้งคีย์"
+       เทียบแบบ "มีอยู่ในชื่อ" ไม่ได้ เพราะคีย์เต็มของประตูหนึ่งเป็นส่วนท้ายของอีกประตูได้
+       เช่น "1ชั้น1" เป็นส่วนท้ายของ "kfc1ชั้น1" → ประตู KFC จะถูกดูดเข้ามาด้วย */
+    var ex = r.exact || [];
+    for(var e=0;e<ex.length;e++){
+      if(rawGateKey(ex[e]) === raw){ hit = true; break; }
+    }
+
+    for(var j=0;!hit && j<list.length;j++){
       var m = rawGateKey(list[j]);
-      if(m && raw.indexOf(m) >= 0){ hit = true; break; }
+      if(!m) continue;
+      /* คำสำคัญสั้น ๆ ห้ามจับแบบ "มีอยู่ในชื่อ" เด็ดขาด
+         เคสจริงที่พัง: ผู้ใช้จับคู่ "ประตู 1 ชั้น.1" กับ "ประตู 2 ชั้น.1"
+         ระบบสร้างคำสำคัญเป็น "1" กับ "2" → ประตูทุกบานที่ชื่อมีเลข 1 หรือ 2
+         (kfc1ชั้น1, donki2ชั้น2, …) ถูกยุบรวมเป็นประตูเดียวทั้งหมด
+         ยอดสิบกว่าประตูถูกบวกกองเดียวโดยไม่มีอะไรบนหน้าจอบอกเลย
+         คำที่สั้นกว่า 3 ตัวอักษรจึงต้องตรงกันทั้งคำเท่านั้น */
+      var ok = (m.length >= 3) ? (raw.indexOf(m) >= 0) : (raw === m);
+      if(ok){ hit = true; break; }
     }
     if(hit){
       /* ผนวกชั้นเข้าไปในคีย์ด้วย — ประตูคนละชั้นคือคนละจุดเสมอ
@@ -1968,7 +2007,16 @@ async function loadData(force, quiet){
         }
 
         var days = fr.days || [];
-        if(!days.length) emptyFiles.push(fr.name);
+        /* ไฟล์ที่อ่านได้ 0 วัน ก็ห้ามเก็บลงแคชด้วยเหตุผลเดียวกับไฟล์ที่ error
+           เดิมเก็บไว้พร้อม mtime ปัจจุบัน → รอบหน้าเห็นว่า "แคชตรงแล้ว" → ไม่อ่านซ้ำ
+           เดือนนั้นจะว่างถาวรจนกว่าจะมีคนไปแก้ไฟล์ต้นทางให้ mtime เปลี่ยน
+           ทั้งที่ผู้ใช้กด "โหลดข้อมูล" ซ้ำตามที่ข้อความแนะนำแล้วก็ไม่ช่วยอะไร */
+        if(!days.length){
+          emptyFiles.push(fr.name);
+          delete cacheMap[fr.id];
+          writes.push(DB.del(fr.id));
+          return;
+        }
 
         cacheMap[fr.id] = { id:fr.id, name:fr.name, mtime:fr.mtime, days:days };
         writes.push(DB.put(cacheMap[fr.id]));
@@ -2021,8 +2069,19 @@ async function loadData(force, quiet){
     });
 
     $('noData').classList.add('hidden');
-    applyPreset();
-    renderAll();
+
+    /* วาดหน้าจอแยก try ของตัวเอง — ถ้า renderAll พังหลังโหลดข้อมูลสำเร็จแล้ว
+       ต้องไม่ไปแจ้งผู้ใช้ว่า "โหลดข้อมูลไม่สำเร็จ" ซึ่งชี้ไปผิดทางทั้งหมด
+       (ข้อมูลอยู่ครบใน DATA แล้ว ปัญหาอยู่ที่การแสดงผล) */
+    try{
+      applyPreset();
+      renderAll();
+    }catch(rErr){
+      console.error('renderAll ล้มเหลว:', rErr);
+      setStatus('โหลดข้อมูลสำเร็จ แต่แสดงผลไม่สำเร็จ','warn');
+      toast('ข้อมูลโหลดครบแล้ว แต่แสดงผลบางส่วนไม่สำเร็จ — ลองสลับหน้าหรือรีเฟรช · '
+            + (rErr.message || String(rErr)), 'warn', 12000);
+    }
 
   }catch(err){
     console.error(err);
@@ -2063,7 +2122,13 @@ function setSyncing(on){
    ส่วนที่ 7 · สร้างโมเดลข้อมูล (normalize + index)
 ============================================================================ */
 function buildModel(fileRecs){
-  var map = {};        // iso → day  (กันวันซ้ำ)
+  /* ใช้ Object.create(null) แทน {} สำหรับทุกที่ที่เอา "ข้อความจากไฟล์" มาเป็นคีย์
+     ออบเจกต์ปกติมีคุณสมบัติติดตัวมาจาก prototype อยู่แล้ว (constructor, __proto__, toString)
+     ถ้าบังเอิญมีชื่อประตูหรือคีย์ที่ normalize แล้วตรงกับชื่อพวกนั้น
+     การเช็ค if(!m[k]) จะได้ค่าจริงกลับมาแล้วข้ามการสร้าง record ไป → ประตูนั้นหายเงียบ ๆ
+     กรณี __proto__ ร้ายกว่านั้นคือไปเขียนทับ prototype ทำให้ทั้งแอปเพี้ยน
+     ตารางที่ไม่มี prototype ปิดช่องนี้ทั้งหมดโดยไม่ต้องไล่ตรวจชื่อทีละแบบ */
+  var map = Object.create(null);        // iso → day  (กันวันซ้ำ)
   var dupes = [];
 
   fileRecs.forEach(function(fr){
@@ -2108,9 +2173,17 @@ function buildModel(fileRecs){
   fillFloorFilter();
 }
 
+/* ให้คะแนน "ความมีข้อมูล" ของหนึ่งวัน ใช้ตัดสินตอนเจอวันซ้ำ
+   ต้องอ่านได้ทั้งสองรูปแบบชื่อฟิลด์: ตัวที่ยังไม่ผ่าน enrichDay ใช้ carIn24/carOut24
+   ส่วนตัวที่อยู่ใน map แล้วถูกเปลี่ยนชื่อเป็น carIn/carOut
+   ถ้าอ่านชื่อเดียว ฝั่งที่อยู่ใน map จะได้คะแนนรถ = 0 เสมอ
+   แล้ววันที่มีรถหมื่นคันจะถูกวันที่แทบว่างทับทิ้ง — ตรวจไม่พบจากหน้าจอเลย */
 function totalOf(d){
   var s = d.s||{};
-  return (s.custIn||0)+(s.custOut||0)+(s.carIn24||0)+(s.carOut24||0);
+  function n(v){ return Number.isFinite(v) ? v : 0; }
+  return n(s.custIn)+n(s.custOut)
+       + n(s.carIn24 !== undefined ? s.carIn24  : s.carIn)
+       + n(s.carOut24!== undefined ? s.carOut24 : s.carOut);
 }
 
 /* เติมข้อมูลที่คำนวณได้จากวันที่ + ทำ key ประตูให้จับคู่ข้ามวันได้ */
@@ -2140,8 +2213,23 @@ function enrichDay(d, iso){
   o.pok = o.pno.map(gateKey);
   o.vik = o.vni.map(gateKey);
   o.vok = o.vno.map(gateKey);
-  // วันที่ยังไม่ได้คีย์ข้อมูล — ต้องตัดออกจากการหาค่าเฉลี่ย ไม่งั้นค่าเฉลี่ยต่ำผิดจริง
-  o.blank = !(o.s.custIn>0 || o.s.custOut>0 || o.s.carIn>0 || o.s.carOut>0);
+  /* วันที่ยังไม่ได้คีย์ข้อมูล — ต้องตัดออกจากการหาค่าเฉลี่ย ไม่งั้นค่าเฉลี่ยต่ำผิดจริง
+
+     เดิมดูแค่ 4 ช่องสรุป ซึ่งพลาดกรณีที่พบจริง: ตารางรายประตูคีย์ครบแล้ว
+     แต่แถวสรุปด้านล่างยังว่าง → ทั้งวันถูกตีว่า "ยังไม่คีย์" แล้วหายจากทุกหน้า
+     รวมถึงหายจากการตรวจคุณภาพข้อมูลด้วย จึงไม่มีใครรู้ว่ามันหายไป
+     แก้โดยนับว่ามีข้อมูลถ้ามีตัวเลขจากทางใดทางหนึ่ง */
+  function anyPos(a){
+    if(!a || !a.length) return false;
+    for(var i=0;i<a.length;i++) if((a[i]||0) > 0) return true;
+    return false;
+  }
+  o.blank = !(o.s.custIn>0 || o.s.custOut>0 || o.s.carIn>0 || o.s.carOut>0
+           || anyPos(o.pi) || anyPos(o.po) || anyPos(o.vi) || anyPos(o.vo)
+           || anyPos(o.ph) || anyPos(o.vh));
+  /* แยกธงไว้ต่างหาก เพื่อให้หน้าคุณภาพข้อมูลเตือนได้ว่า "แถวสรุปว่างแต่ประตูมีข้อมูล"
+     ซึ่งแปลว่าไฟล์ต้นทางคีย์ไม่ครบ ไม่ใช่ว่าไม่มีคนเข้าห้าง */
+  o.sumMissing = !o.blank && !(o.s.custIn>0 || o.s.custOut>0 || o.s.carIn>0 || o.s.carOut>0);
   return o;
 }
 function num(v){ return Number.isFinite(v) ? v : 0; }
@@ -2150,7 +2238,7 @@ function num(v){ return Number.isFinite(v) ? v : 0; }
    เพราะร้านมีการเปลี่ยนชื่อ (เช่น Starbucks → Donki) และบางชีตพิมพ์ตกหล่น */
 function buildGateIndex(days){
   function build(nameKey, keyKey, valKey){
-    var m = {};
+    var m = Object.create(null);
     days.forEach(function(d){
       var names=d[nameKey], keys=d[keyKey], vals=d[valKey];
       for(var i=0;i<keys.length;i++){
@@ -2257,7 +2345,11 @@ async function mergeGates(fromName, toName, displayName){
   var id = 'u_' + (Date.now().toString(36)) + '_' + Math.floor(Math.random()*1e4).toString(36);
   CFG.gateMerge.push({
     id:id, name: displayName || toName, was: fromName,
-    match: [bareGate(fromName), bareGate(toName)]
+    /* match = คำสำคัญ (จับแบบ "มีอยู่ในชื่อ" เฉพาะคำยาว ≥ 3 ตัวอักษร)
+       exact = คีย์เต็มของทั้งสองชื่อ จับแบบตรงทั้งคีย์เท่านั้น
+       แยกสองรายการเพราะคีย์เต็มของประตูหนึ่งอาจเป็นส่วนท้ายของอีกประตูได้ */
+    match: [bareGate(fromName), bareGate(toName)],
+    exact: [rawGateKey(fromName), rawGateKey(toName)]
   });
   saveCfg();
   await rebuildFromCache('รวมประตูแล้ว — "'+bareGate(fromName)+'" กับ "'+bareGate(toName)+'" นับเป็นประตูเดียวกัน');
@@ -2337,6 +2429,13 @@ function applyPreset(){
 
   if(from < first) from = first;
   if(to   > last)  to   = last;
+  /* กันช่วงกลับหัว: กด "เดือนที่แล้ว" ตอนที่ข้อมูลมีแค่เดือนปัจจุบัน
+     จะได้ from = 1 ส.ค. แต่ to = 31 ก.ค. → ทุกหน้าว่างเปล่าโดยไม่มีคำอธิบาย
+     ถอยไปใช้ทั้งช่วงที่มีจริงแทน แล้วบอกผู้ใช้ว่าทำไม */
+  if(from > to){
+    toast('ยังไม่มีข้อมูลของช่วงที่เลือก — แสดงทั้งช่วงที่มีอยู่แทน','warn',7000);
+    from = first; to = last;
+  }
   STATE.filter.from = from;
   STATE.filter.to   = to;
   var fi=$('fFrom'), ti=$('fTo');
@@ -2409,7 +2508,11 @@ function updateFilterSummary(){
   if(f.dayType!=='all') txt += ' · ' + $('fDayType').selectedOptions[0].textContent;
   if(f.floor!=='all')   txt += ' · ' + f.floor;
   var e=$('filterSummary'); if(e) e.textContent = txt;
-  try{ renderCtxBar(); }catch(err){}   // แถบบริบทพังต้องไม่ทำให้ตัวกรองใช้ไม่ได้
+  /* แถบบริบทพังต้องไม่ทำให้ตัวกรองใช้ไม่ได้ — แต่ต้องไม่เงียบสนิทด้วย
+     เพราะแถบนี้คือตัวที่บอกผู้ใช้ว่าข้อมูลเก่าแค่ไหน ถ้ามันตายเงียบ
+     หน้าจอจะดูเหมือน "ข้อมูลครบ" ทั้งที่ความจริงไม่ใช่ */
+  try{ renderCtxBar(); }
+  catch(err){ console.error('renderCtxBar ล้มเหลว:', err); }
 }
 
 /* ============================================================================
@@ -2555,7 +2658,9 @@ function aggregate(days, floorFilter){
     moto:0, taxi:0, deli:0,
     ph: zeros(PED_HOURS.length), pho: zeros(PED_HOURS.length),
     vh: zeros(VEH_HOURS.length), vho: zeros(VEH_HOURS.length),
-    gateIn:{}, gateOut:{}, vehGateIn:{}, vehGateOut:{},
+    /* ตารางที่ใช้ชื่อประตูเป็นคีย์ ต้องไม่มี prototype (เหตุผลเดียวกับ buildModel) */
+    gateIn:Object.create(null), gateOut:Object.create(null),
+    vehGateIn:Object.create(null), vehGateOut:Object.create(null),
     byDate: [], byMonth:{}, byYear:{}, byDow: [[],[],[],[],[],[],[]],
     peak:null, low:null
   };
@@ -2667,14 +2772,19 @@ function densityOfDay(d, mode){
   if(mode==='c'){ inArr=d.vh; outArr=d.vho; grid=VEH_HOURS; }
   else          { inArr=d.ph; outArr=d.pho; grid=PED_HOURS; }
 
-  // ฐานของรถ = ยอดสุทธิสะสมก่อน 11:00
+  /* ฐาน = ยอดสุทธิสะสมของทุกชั่วโมง "ก่อน" ชั่วโมงแรกของตารางความหนาแน่น
+     เดิมคิดฐานให้เฉพาะรถ ทำให้ฝั่งลูกค้าพัง: ตารางลูกค้าเริ่มนับที่ 10:00
+     แต่ตารางความหนาแน่นเริ่มที่ 11:00 → คนที่เข้าช่วง 10–11 ไม่เคยถูกบวก
+     แต่ถูกอนุญาตให้ "ออก" ตั้งแต่ 11:00 → ตัวเลขติดลบได้จริง (เคยเห็น -2,000 คน)
+     คิดฐานด้วยสูตรเดียวกันทั้งสองโหมดจึงถูกต้องกว่าและอธิบายง่ายกว่า */
+  var firstHour = DENS_HOURS[0];
   var base = 0;
-  if(mode==='c'){
-    for(var h=1; h<=10; h++){
-      var i = grid.indexOf(h);
-      if(i>=0) base += (inArr[i]||0) - (outArr[i]||0);
-    }
+  for(var gi=0; gi<grid.length; gi++){
+    if(grid[gi] < firstHour) base += (inArr[gi]||0) - (outArr[gi]||0);
   }
+  /* ฐานติดลบไม่มีความหมายทางกายภาพ (คนออกมากกว่าเข้าก่อนห้างเปิด = ข้อมูลคลาดเคลื่อน)
+     ปัดขึ้นเป็น 0 ดีกว่าปล่อยให้ค่าติดลบไหลไปทั้งวัน */
+  if(base < 0) base = 0;
   res.base = base;
 
   var cur = base;
@@ -2683,8 +2793,11 @@ function densityOfDay(d, mode){
     var vin  = idx>=0 ? (inArr[idx]||0)  : 0;
     var vout = idx>=0 ? (outArr[idx]||0) : 0;
     cur = cur + vin - vout;
+    if(cur < 0) cur = 0;          // จำนวนคน/รถ "ที่อยู่ข้างใน" ติดลบไม่ได้
     res.values.push(cur);
   }
+  res.hasData = false;
+  for(var q=0;q<grid.length;q++){ if((inArr[q]||0)>0 || (outArr[q]||0)>0){ res.hasData = true; break; } }
   var mx = -Infinity, mi = -1;
   res.values.forEach(function(v,i){ if(v>mx){ mx=v; mi=i; } });
   if(mi>=0){ res.peak = mx; res.peakHour = DENS_HOURS[mi]; }
@@ -2695,17 +2808,27 @@ function densityOfDay(d, mode){
    เพราะ "ความหนาแน่น" เป็นค่า ณ ขณะหนึ่ง การเอามาบวกกันไม่มีความหมาย */
 function densityAvg(days, mode){
   if(!days.length) return { hours:DENS_HOURS.slice(), values:DENS_HOURS.map(function(){return 0;}), peak:null, peakHour:null, n:0 };
-  var acc = zeros(DENS_HOURS.length), baseSum = 0;
+  /* หารด้วย "จำนวนวันที่มีข้อมูลรายชั่วโมงจริง" ไม่ใช่จำนวนวันทั้งหมด
+     ไฟล์บางเดือนไม่มีตารางรายชั่วโมงเลย ถ้านับวันพวกนั้นในตัวหาร
+     เส้นความหนาแน่นและ KPI จะต่ำกว่าความจริงหลายสิบเปอร์เซ็นต์แบบไม่มีสัญญาณเตือน
+     (gateHourly ใช้ตัวนับแยกอยู่แล้ว ตรงนี้จึงต้องทำให้ตรงกัน) */
+  var acc = zeros(DENS_HOURS.length), baseSum = 0, counted = 0;
   days.forEach(function(d){
     var r = densityOfDay(d, mode);
+    if(!r.hasData) return;
+    counted++;
     baseSum += r.base;
     r.values.forEach(function(v,i){ acc[i]+=v; });
   });
-  var vals = acc.map(function(v){ return v/days.length; });
+  if(!counted){
+    return { hours:DENS_HOURS.slice(), values:DENS_HOURS.map(function(){return 0;}),
+             base:0, peak:null, peakHour:null, n:0, skipped:days.length };
+  }
+  var vals = acc.map(function(v){ return v/counted; });
   var mx=-Infinity, mi=-1;
   vals.forEach(function(v,i){ if(v>mx){ mx=v; mi=i; } });
-  return { hours:DENS_HOURS.slice(), values:vals, base:baseSum/days.length,
-           peak:mx, peakHour:DENS_HOURS[mi], n:days.length };
+  return { hours:DENS_HOURS.slice(), values:vals, base:baseSum/counted,
+           peak:mx, peakHour:DENS_HOURS[mi], n:counted, skipped:days.length-counted };
 }
 
 /* ความหนาแน่นรายประตู — ใช้ข้อมูลรายชั่วโมงแยกประตูจาก backend
@@ -2713,7 +2836,7 @@ function densityAvg(days, mode){
 function gateHourly(days, gateKeys, dir){
   var keyArr  = dir==='out' ? 'pok' : 'pk';
   var hourArr = dir==='out' ? 'gpo' : 'gpi';
-  var acc = {};
+  var acc = Object.create(null);
   gateKeys.forEach(function(k){ acc[k] = zeros(PED_HOURS.length); });
   var counted = 0;
   days.forEach(function(d){
@@ -2805,7 +2928,7 @@ function pickMetric(d, field){
    ช่วงความเชื่อมั่น: ±1.5 × MAD ของวันเดียวกันของสัปดาห์
    ⚠ เป็นการประมาณจากรูปแบบในอดีต ไม่รวมปัจจัยภายนอก (โปรโมชัน อากาศ เหตุการณ์พิเศษ)
 ============================================================================ */
-function forecast(days, field, horizon){
+function forecast(days, field, horizon, anchorDate){
   horizon = horizon || 14;
   var clean = days.filter(function(d){ return !d.blank; });
   if(clean.length < 21){
@@ -2814,7 +2937,18 @@ function forecast(days, field, horizon){
 
   var vals = {};                                  // iso → value
   clean.forEach(function(d){ vals[d.d] = pickMetric(d, field); });
+
+  /* วันอ้างอิงสำหรับสร้างฐานสถิติ = วันสุดท้ายที่ "มีข้อมูลจริง" */
   var lastDate = clean[clean.length-1].d;
+
+  /* แต่จุดเริ่มนับวันข้างหน้า ต้องเป็นวันสุดท้ายของ "ชุดข้อมูลทั้งหมด" รวมวันที่ยังไม่คีย์
+     เหตุผล: การคีย์ข้อมูลมักตามหลังจริงหลายวัน (ระบบเองก็เตือนเรื่องนี้อยู่)
+     ถ้าเริ่มนับจากวันที่มีข้อมูลล่าสุด การ์ด "พยากรณ์ 7 วันข้างหน้า"
+     จะมีหลายวันที่ผ่านไปแล้ว — ผู้ใช้เอายอดนั้นไปวางแผนล่วงหน้าไม่ได้
+     ผู้เรียกส่ง anchorDate มาเองได้ (backtest ใช้ค่านี้เพื่อให้เทียบตรงวัน) */
+  var startFrom = anchorDate || (days.length ? days[days.length-1].d : lastDate);
+  if(startFrom < lastDate) startFrom = lastDate;
+  var lagDays = daysBetween(lastDate, startFrom);
 
   // ② ตัวคูณแนวโน้ม
   var recent = clean.filter(function(d){ return daysBetween(d.d, lastDate) < 28; }).map(function(d){ return vals[d.d]; });
@@ -2825,8 +2959,11 @@ function forecast(days, field, horizon){
     if(Number.isFinite(r)&&Number.isFinite(o)&&o>0) trend = clamp(r/o, 0.80, 1.25);
   }
 
-  // ③ ตัวคูณวันหยุด
-  var holVals = clean.filter(function(d){ return d.hol; }).map(function(d){ return vals[d.d]; });
+  /* ③ ตัวคูณวันหยุด — ต้องเทียบวันหยุด "ที่ตรงกับวันธรรมดา" กับวันธรรมดาปกติเท่านั้น
+     เดิมเอาวันหยุดที่ตรงกับเสาร์–อาทิตย์มารวมในตัวตั้งด้วย ซึ่งคึกคักกว่าอยู่แล้วตามธรรมชาติ
+     ตัวคูณจึงพองเกินจริง แล้วถูกเอาไปคูณกับวันหยุดที่เป็นวันธรรมดา (บรรทัดล่าง)
+     ทำให้พยากรณ์ของวันนั้นสูงเกินจริงเท่ากับส่วนต่างเสาร์อาทิตย์ทั้งก้อน */
+  var holVals = clean.filter(function(d){ return d.hol && d.dow<=4; }).map(function(d){ return vals[d.d]; });
   var wdVals  = clean.filter(function(d){ return !d.hol && d.dow<=4; }).map(function(d){ return vals[d.d]; });
   var holFactor = 1;
   if(holVals.length>=3 && wdVals.length>=10){
@@ -2854,7 +2991,7 @@ function forecast(days, field, horizon){
 
   var points = [];
   for(var i=1;i<=horizon;i++){
-    var iso = addDays(lastDate, i);
+    var iso = addDays(startFrom, i);
     var dw  = dowOf(iso);
     var hol = isHoliday(iso);
     var base = dowBase[dw] * trend;
@@ -2872,7 +3009,7 @@ function forecast(days, field, horizon){
 
   return {
     ok:true, points:points, trend:trend, holFactor:holFactor,
-    lastDate:lastDate, basedOn:clean.length,
+    lastDate:lastDate, startFrom:startFrom, lagDays:lagDays, basedOn:clean.length,
     note:'พยากรณ์จากรูปแบบในอดีต ไม่รวมปัจจัยภายนอก เช่น โปรโมชัน สภาพอากาศ หรือเหตุการณ์พิเศษ'
   };
 }
@@ -2887,19 +3024,37 @@ function backtest(days, field, horizon){
 
   var train = clean.slice(0, clean.length-horizon);
   var test  = clean.slice(clean.length-horizon);
-  var fc = forecast(train, field, horizon);
+
+  /* ต้องพยากรณ์ให้ครอบคลุมทุกวันในชุดทดสอบ "ตามปฏิทิน" ไม่ใช่ตามจำนวนแถว
+     ถ้าในชุดทดสอบมีวันที่ยังไม่คีย์คั่นอยู่ ระยะปฏิทินจะยาวกว่าจำนวนแถว
+     เดิมพยากรณ์แค่ 14 วันปฏิทิน จึงจับคู่ได้ไม่ครบ แล้วเงียบ ๆ ตัดวันที่เหลือทิ้ง
+     ผลคือความแม่นยำถูกคำนวณจากตัวอย่างที่เหลือน้อยและถูกคัดมาเฉพาะที่เข้าทาง */
+  var span = daysBetween(train[train.length-1].d, test[test.length-1].d);
+  if(!Number.isFinite(span) || span < horizon) span = horizon;
+  if(span > horizon*3) span = horizon*3;          // กันช่องว่างยาวผิดปกติทำให้คำนวณบานปลาย
+
+  var fc = forecast(train, field, span, train[train.length-1].d);
   if(!fc.ok) return null;
 
-  var errs = [], pcts = [];
+  var errs = [], pcts = [], matched = 0;
   var map = {}; test.forEach(function(d){ map[d.d] = pickMetric(d, field); });
   fc.points.forEach(function(p){
     var actual = map[p.date];
-    if(!Number.isFinite(actual) || actual===0) return;
+    if(!Number.isFinite(actual)) return;
+    matched++;
+    if(actual === 0) return;                       // หาร 0 ไม่ได้ นับไว้ใน matched แล้ว
     errs.push(Math.abs(p.value-actual));
     pcts.push(Math.abs(p.value-actual)/actual*100);
   });
-  if(!pcts.length) return null;
-  return { mape: avg(pcts), mae: avg(errs), n: pcts.length,
+
+  /* ตัวอย่างน้อยเกินไปแล้วยังโชว์เป็น "ความแม่นยำ" คือการให้ความมั่นใจผิด ๆ
+     ต่ำกว่า 5 วันถือว่าเชื่อไม่ได้ ให้บอกว่าประเมินไม่ได้ดีกว่าบอกตัวเลขลอย ๆ */
+  if(pcts.length < 5){
+    return { ok:false, n: pcts.length, tested: test.length, matched: matched,
+             reason:'ข้อมูลที่เทียบได้มีเพียง '+pcts.length+' วัน — ยังประเมินความแม่นยำไม่ได้' };
+  }
+  return { ok:true, mape: avg(pcts), mae: avg(errs), n: pcts.length,
+           tested: test.length, matched: matched,
            accuracy: clamp(100-avg(pcts), 0, 100) };
 }
 
@@ -3081,7 +3236,7 @@ function buildInsights(cur, prev, days){
     var share = safeDiv(peakVal, sum(cur.ph));
     out.push({
       kind:'info',
-      title:'ชั่วโมงเร่งด่วนคือ '+hourLabel(PED_HOURS[peakIdx])+'–'+hourLabel(PED_HOURS[peakIdx]+1),
+      title:'ชั่วโมงเร่งด่วนคือ '+hourSpanLabel(PED_HOURS, peakIdx),
       body:'มีลูกค้าเข้า '+fmt(peakVal)+' คนในช่วงนี้ คิดเป็น '+
            (share!==null? fmt1(share*100)+'%' : '—')+' ของทั้งวัน'
     });
@@ -3664,8 +3819,7 @@ function groupSeries(records, gran){
     if(gran==='month'){ key = r.d.slice(0,7); }
     else {
       // สัปดาห์เริ่มวันจันทร์ตามธรรมเนียมไทย
-      var dt = toDate(r.d); dt.setDate(dt.getDate() - ((dt.getDay()+6)%7));
-      key = isoOf(dt);
+      key = weekKeyOf(r.d);
     }
     var b = buckets[key] || (buckets[key] = { key:key, custIn:0, custOut:0, carIn:0, n:0 });
     b.custIn+=r.custIn; b.custOut+=r.custOut; b.carIn+=r.carIn; b.n++;
@@ -3731,7 +3885,13 @@ function renderGates(){
     if(k==='floor'){ return dir*(floorRank(a.floor)-floorRank(b.floor)); }
     if(k==='avg'){ av=safeDiv(a.total,a.days)||0; bv=safeDiv(b.total,b.days)||0; }
     else if(k==='out'){ av=(cur.gateOut[a.key]||{}).total||0; bv=(cur.gateOut[b.key]||{}).total||0; }
-    else if(k==='chg'){ av=gateChange(a,prev)||-1e9; bv=gateChange(b,prev)||-1e9; }
+    else if(k==='chg'){
+      /* ห้ามใช้ || เพราะ 0% (ยอดเท่าเดิมเป๊ะ) จะถูกตีเป็น "ไม่มีค่า" แล้วถูกดันไปท้ายสุด
+         ทั้งที่ควรอยู่กลางตารางระหว่างประตูที่เพิ่มขึ้นกับที่ลดลง */
+      var ca = gateChange(a,prev), cb = gateChange(b,prev);
+      av = Number.isFinite(ca) ? ca : -1e9;
+      bv = Number.isFinite(cb) ? cb : -1e9;
+    }
     else if(k==='max'){ av=a.max; bv=b.max; }
     else { av=a.total; bv=b.total; }
     return dir*(av-bv);
@@ -3777,7 +3937,7 @@ function renderGates(){
     + '<div class="mt-4">'
     + card('ตารางสรุปรายประตู', 'คลิกหัวคอลัมน์เพื่อเรียงลำดับ',
         '<div class="tbl-wrap" style="max-height:560px"><table class="tbl" id="tblGates"><thead><tr>'
-        + '<th data-k="total">ประตู</th><th data-k="floor">ชั้น</th><th data-k="total">ยอดเข้ารวม</th>'
+        + '<th data-k="name">ประตู</th><th data-k="floor">ชั้น</th><th data-k="total">ยอดเข้ารวม</th>'
         + '<th data-k="avg">เฉลี่ย/วัน</th><th data-k="out">ยอดออกรวม</th><th data-k="max">สูงสุดวันเดียว</th>'
         + '<th data-k="chg">เทียบช่วงก่อน</th><th class="no-sort">สัดส่วน</th>'
         + '</tr></thead><tbody>'+rows+'</tbody>'
@@ -3843,10 +4003,14 @@ function gateChange(g, prev){
    ส่วนที่ 18 · หน้า "ความหนาแน่นรายชั่วโมง"
    ต่อยอดจาก Gate Intensity Dashboard v51 — แต่ดึงข้อมูลจาก backend ตัวเดียวกัน
 ============================================================================ */
+/* สีต้องอ่านใหม่ทุกครั้งที่ใช้ ไม่ใช่ตรึงไว้ตอนโหลดสคริปต์
+   tone() อ่านธีมปัจจุบัน ณ เวลาที่เรียก — ถ้าเก็บค่าไว้ตั้งแต่ตอนโหลด
+   พอผู้ใช้สลับสว่าง↔มืด กราฟหน้านี้จะยังใช้เฉดของธีมเดิมจนกลืนกับพื้นหลัง
+   (METRIC_COLOR ใน 03_core ทำเป็น getter ไว้ถูกแล้ว ตรงนี้จึงต้องทำให้ตรงกัน) */
 var DENS_META = {
-  p: { name:'ลูกค้า', unit:'คน', color:tone('blue'), color2:tone('mint'),
+  p: { name:'ลูกค้า', unit:'คน', get color(){ return tone('blue'); }, get color2(){ return tone('mint'); },
        formula:'ความหนาแน่น ณ ชั่วโมงใด = (ค่าชั่วโมงก่อนหน้า + ลูกค้าเข้า) − ลูกค้าออก · เริ่มนับที่ 0 เวลา 11:00' },
-  c: { name:'รถยนต์', unit:'คัน', color:tone('purple'), color2:tone('amber'),
+  c: { name:'รถยนต์', unit:'คัน', get color(){ return tone('purple'); }, get color2(){ return tone('amber'); },
        formula:'① ฐาน = Σ(รถเข้า − รถออก) ช่วง 01:00–10:00 (รถที่ค้างอยู่ก่อนห้างเปิด) ② ความหนาแน่น 11:00 = ฐาน + รถเข้า 11:00 − รถออก 11:00 ③ ชั่วโมงถัดไปสะสมต่อเนื่องถึง 22:00' }
 };
 
@@ -3939,7 +4103,14 @@ function renderIntensity(){
 
   var seg = $('densMode');
   if(seg) seg.querySelectorAll('button').forEach(function(b){
-    b.onclick = function(){ STATE.intensityMode = b.dataset.m; renderIntensity(); };
+    /* ต้องเก็บกวาด listener ระดับ document ของดรอปดาวน์ประตูก่อนวาดใหม่เสมอ
+       เพราะ renderIntensity ถูกเรียกตรง ๆ ไม่ผ่าน renderCurrent ที่ทำ cleanup ให้
+       ถ้าไม่ทำ กดสลับโหมด 20 ครั้ง = listener ค้าง 40 ตัวที่ชี้ไปยัง DOM ที่ถูกลบแล้ว */
+    b.onclick = function(){
+      STATE.intensityMode = b.dataset.m;
+      try{ cleanupGateSelects(); }catch(e){}
+      renderIntensity();
+    };
   });
   if(mode==='p'){
     var gl = densGateList();
@@ -4333,8 +4504,10 @@ function compareControls(aFrom,aTo,bFrom,bTo,modeLabel){
     + '</div>'
     + (m==='custom'
         ? '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 pt-3 border-t" style="border-color:var(--line)">'
-          + '<div><label class="lb">ช่วง B ตั้งแต่</label><input type="date" class="inp w-full" id="cmpBFrom" value="'+bFrom+'"></div>'
-          + '<div><label class="lb">ช่วง B ถึง</label><input type="date" class="inp w-full" id="cmpBTo" value="'+bTo+'"></div>'
+          /* addDays คืน null ได้ ถ้าปล่อยผ่านจะได้ value="null" แล้วเบราว์เซอร์ทิ้งค่า
+             ผู้ใช้จะเห็นช่องวันที่ว่างเปล่าโดยไม่รู้ว่าทำไม */
+          + '<div><label class="lb">ช่วง B ตั้งแต่</label><input type="date" class="inp w-full" id="cmpBFrom" value="'+esc(isIso(bFrom)?bFrom:'')+'"></div>'
+          + '<div><label class="lb">ช่วง B ถึง</label><input type="date" class="inp w-full" id="cmpBTo" value="'+esc(isIso(bTo)?bTo:'')+'"></div>'
           + '<div class="flex items-end"><button class="btn btn-primary" id="cmpApply">ใช้ช่วงนี้</button></div>'
           + '</div>'
         : '')
@@ -4418,6 +4591,10 @@ function renderForecast(){
     +     [7,14,30].map(function(n){ return '<button data-n="'+n+'" class="'+(STATE.forecastDays===n?'on':'')+'">'+n+' วัน</button>'; }).join('')
     +   '</div>'
     +   '<span class="hint flex-1 min-w-[220px]"><b>ฐานข้อมูลที่ใช้เรียนรู้:</b> '+esc(winLabel)+'<br>'
+    +     ((fc.ok && fc.lagDays>0)
+          ? '<b style="color:var(--warn)">ข้อมูลล่าสุดที่คีย์แล้วคือ '+esc(thDate(fc.lastDate,'medium'))
+            +' ซึ่งช้ากว่าวันสุดท้ายของชุดข้อมูล '+fc.lagDays+' วัน — '
+            +'ค่าพยากรณ์เริ่มนับจากวันถัดจาก '+esc(thDate(fc.startFrom,'medium'))+'</b><br>' : '')
     +     esc(fc.ok? fc.note : '')+'</span>'
     + '</div></div>'
 
@@ -4428,8 +4605,9 @@ function renderForecast(){
                 value: fmtPct((fc.trend-1)*100), unit:'',
                 sub:'28 วันล่าสุดเทียบ 28 วันก่อนหน้า' })
     + kpiCard({ grad:'g-teal', icon:ICON.people, label:'ความแม่นของโมเดล (ทดสอบย้อนหลัง)',
-                value: bt? fmt1(bt.accuracy) : '—', unit:'%',
-                sub: bt? 'คลาดเคลื่อนเฉลี่ย '+fmt1(bt.mape)+'% จาก '+bt.n+' วัน' : 'ข้อมูลไม่พอสำหรับทดสอบ' })
+                value: (bt && bt.ok) ? fmt1(bt.accuracy) : '—', unit:'%',
+                sub: (bt && bt.ok) ? 'คลาดเคลื่อนเฉลี่ย '+fmt1(bt.mape)+'% จาก '+bt.n+' วัน'
+                                   : (bt && bt.reason ? bt.reason : 'ข้อมูลไม่พอสำหรับทดสอบ') })
     + kpiCard({ grad: an.length?'g-rose':'g-slate', icon:ICON.peak, label:'วันที่ยอดผิดปกติ',
                 value: fmt(an.length), unit:'วัน', sub:'จาก '+fmt(days.length)+' วันที่ตรวจสอบ' })
     + '</div>'
@@ -4655,7 +4833,7 @@ function renderGateTrend(){
   days.forEach(function(d){
     var key;
     if(gran==='month') key = d.ym;
-    else if(gran==='week'){ var dt=toDate(d.d); dt.setDate(dt.getDate()-((dt.getDay()+6)%7)); key = isoOf(dt); }
+    else if(gran==='week'){ key = weekKeyOf(d.d); }
     else key = d.d;
     if(!buckets[key]){ buckets[key] = { key:key, n:0, g:{} }; order.push(key); }
     var b = buckets[key]; b.n++;
@@ -4758,9 +4936,12 @@ function renderGateTrend(){
   drawTrendLines();
 
   var sg=$('gtGran');
-  if(sg) sg.querySelectorAll('button').forEach(function(b){ b.onclick=function(){ STATE.trendGran=b.dataset.g; renderGateTrend(); }; });
+  /* เช่นเดียวกับหน้าความหนาแน่น — วาดใหม่ตรง ๆ ต้องเก็บกวาด listener เดิมก่อน */
+  if(sg) sg.querySelectorAll('button').forEach(function(b){ b.onclick=function(){
+    STATE.trendGran=b.dataset.g; try{ cleanupGateSelects(); }catch(e){} renderGateTrend(); }; });
   var sd=$('gtDir');
-  if(sd) sd.querySelectorAll('button').forEach(function(b){ b.onclick=function(){ STATE.trendDir=b.dataset.d; renderGateTrend(); }; });
+  if(sd) sd.querySelectorAll('button').forEach(function(b){ b.onclick=function(){
+    STATE.trendDir=b.dataset.d; try{ cleanupGateSelects(); }catch(e){} renderGateTrend(); }; });
   bindGateSelect('gtPicker', list, 'trendGates', drawTrendLines);
 }
 
@@ -5217,7 +5398,7 @@ function gateMergePanel(){
           +       fmt1((c.ratio-1)*100)+'%)'
           +     '</div>'
           +   '</div>'
-          +   '<button class="btn btn-sm btn-primary" data-merge="'+i+'">รวมเป็นประตูเดียว</button>'
+          +   '<button class="btn btn-sm btn-primary" data-merge="'+i+'" data-pair="'+esc(c.from.key+'|'+c.to.key)+'">รวมเป็นประตูเดียว</button>'
           + '</div></div>';
       }).join('')
     : '<div class="hint">ไม่พบประตูที่น่าสงสัยเพิ่มเติม</div>';
@@ -5255,16 +5436,33 @@ function bindGateMergePanel(){
 
   var box = $('gmSuggest');
   if(box) box.querySelectorAll('button[data-merge]').forEach(function(b){
-    b.onclick = function(){
-      var c = cand[+b.dataset.merge]; if(!c) return;
+    /* ผูกด้วย "คีย์ประตู" ไม่ใช่ลำดับในอาร์เรย์
+       เพราะ detectRenamedGates ถูกเรียกสองรอบ (ตอนวาดกับตอนผูกปุ่ม)
+       ถ้าผลสองรอบเรียงไม่เหมือนกัน ผู้ใช้จะกดแล้วได้คู่ประตูผิด
+       ซึ่งเป็นความผิดพลาดที่มองไม่ออกจากตัวเลขบนหน้าจอเลย */
+    b.onclick = async function(){
+      var want = b.dataset.pair || '';
+      var c = null;
+      for(var i=0;i<cand.length;i++){
+        if((cand[i].from.key+'|'+cand[i].to.key) === want){ c = cand[i]; break; }
+      }
+      if(!c) c = cand[+b.dataset.merge];
+      if(!c){ toast('รายการนี้เปลี่ยนไปแล้ว — กรุณาโหลดหน้าใหม่','warn'); return; }
       setBusy(b, true, 'กำลังรวม…');
-      mergeGates(c.from.name, c.to.name, c.to.name);
+      try{ await mergeGates(c.from.name, c.to.name, c.to.name); }
+      catch(e){ console.error(e); toast('รวมประตูไม่สำเร็จ: '+(e.message||e),'err',9000); }
+      finally{ setBusy(b, false); }
     };
   });
 
   var act = $('gmActive');
   if(act) act.querySelectorAll('button[data-unmerge]').forEach(function(b){
-    b.onclick = function(){ setBusy(b, true, 'กำลังแยก…'); unmergeGate(b.dataset.unmerge); };
+    b.onclick = async function(){
+      setBusy(b, true, 'กำลังแยก…');
+      try{ await unmergeGate(b.dataset.unmerge); }
+      catch(e){ console.error(e); toast('แยกประตูไม่สำเร็จ: '+(e.message||e),'err',9000); }
+      finally{ setBusy(b, false); }
+    };
   });
 
   var add = $('gmAdd');
@@ -5762,9 +5960,11 @@ function bindSettings(){
 
   var ir = $('setIconRetry');
   if(ir) ir.onclick = async function(){
-    setBusy(this, true, 'กำลังตรวจ…');
-    await setupIcons();
-    setBusy(this, false);
+    var self = this;
+    setBusy(self, true, 'กำลังตรวจ…');
+    try{ await setupIcons(); }
+    catch(e){ console.error(e); toast('ตรวจไอคอนไม่สำเร็จ: '+(e.message||e),'err'); }
+    finally{ setBusy(self, false); }
     renderSettings();
     var msg = { custom:'ใช้ไอคอนจาก URL ที่ระบุไว้',
                 files :'พบไฟล์ .png ข้างไฟล์ HTML — ใช้ไฟล์จริงแล้ว',
@@ -5907,6 +6107,16 @@ function bindSettings(){
     $('noData').classList.remove('hidden');
     renderSettings();
   };
+}
+/* หน้ารายงานอ่านผลตรวจคุณภาพหลายจุด ถ้า DATA.issues เป็น null
+   (เช่น ผู้ใช้เพิ่งกด "ล้างข้อมูลในเครื่อง" ขณะที่ DATA.days ยังค้างอยู่ในหน่วยความจำ)
+   จะได้ TypeError แล้วรายงานทั้งฉบับกลายเป็นการ์ด error
+   คืนโครงว่างที่มีรูปร่างถูกต้องแทน — รายงานยังพิมพ์ได้ แค่ตัวเลขคุณภาพเป็นศูนย์ */
+function ISS(){
+  var i = DATA.issues;
+  if(i && i.score) return i;
+  return { blankDays:[], missingDays:[], mismatch:[], dupes:[], outliers:[], gaps:[],
+           totalDays:0, score:{ pct:0, grade:'—', problems:0 } };
 }
 /* ============================================================================
    ส่วนที่ 25 · กราฟ SVG สำหรับรายงาน A4
@@ -6147,8 +6357,8 @@ function buildReportPages(days){
         + ' น.</b> เฉลี่ย <b>' + fmt(dp.peak) + ' คน</b>');
     }
     var warn = [];
-    if(DATA.issues.blankDays.length)   warn.push('ยังไม่คีย์ข้อมูล ' + fmt(DATA.issues.blankDays.length) + ' วัน');
-    if(DATA.issues.missingDays.length) warn.push('ไม่มีชีต ' + fmt(DATA.issues.missingDays.length) + ' วัน');
+    if(ISS().blankDays.length)   warn.push('ยังไม่คีย์ข้อมูล ' + fmt(ISS().blankDays.length) + ' วัน');
+    if(ISS().missingDays.length) warn.push('ไม่มีชีต ' + fmt(ISS().missingDays.length) + ' วัน');
     var note = warn.length
       ? '<div style="margin-top:6px;color:#C42241;font-size:9.5px">ข้อควรทราบ: ' + warn.join(' · ')
         + ' — ตัวเลขในรายงานนี้ไม่รวมวันดังกล่าว</div>'
@@ -6323,13 +6533,13 @@ function buildReportPages(days){
     + '<div style="margin-top:12px">'
     +   a4Box('ความครบถ้วนของข้อมูล',
           '<div style="display:flex;gap:20px;font-size:10px;line-height:1.8">'
-          + '<div><b style="font-size:20px;color:'+(DATA.issues.score.pct>=90?'#12A374':'#C08A12')+'">'+fmt1(DATA.issues.score.pct)+'%</b>'
-          +   '<div style="color:#7a5d59">คะแนนคุณภาพ · ระดับ '+esc(DATA.issues.score.grade)+'</div></div>'
+          + '<div><b style="font-size:20px;color:'+(ISS().score.pct>=90?'#12A374':'#C08A12')+'">'+fmt1(ISS().score.pct)+'%</b>'
+          +   '<div style="color:#7a5d59">คะแนนคุณภาพ · ระดับ '+esc(ISS().score.grade)+'</div></div>'
           + '<div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
-          +   a4Stat('วันที่มีข้อมูล', fmt(DATA.issues.totalDays)+' วัน')
-          +   a4Stat('วันที่ยังไม่มีชีต', fmt(DATA.issues.missingDays.length)+' วัน')
-          +   a4Stat('วันที่ยังไม่คีย์', fmt(DATA.issues.blankDays.length)+' วัน')
-          +   a4Stat('ยอดรวมไม่ตรง', fmt(DATA.issues.mismatch.length)+' รายการ')
+          +   a4Stat('วันที่มีข้อมูล', fmt(ISS().totalDays)+' วัน')
+          +   a4Stat('วันที่ยังไม่มีชีต', fmt(ISS().missingDays.length)+' วัน')
+          +   a4Stat('วันที่ยังไม่คีย์', fmt(ISS().blankDays.length)+' วัน')
+          +   a4Stat('ยอดรวมไม่ตรง', fmt(ISS().mismatch.length)+' รายการ')
           + '</div></div>')
     + '</div>', 4);
 
@@ -6568,7 +6778,7 @@ function buildInfographic(days){
           svgBars(PED_HOURS.map(function(h,i){ return { l:String(h), v: cur.ph[i]/n }; }),
                   { w:340, h:150, color:'#12A374', showVal:false })
           + '<div style="font-size:10px;color:#7a5d59;margin-top:3px">ชั่วโมงเร่งด่วนที่สุดคือ <b style="color:#2b1c1c">'
-          + hourLabel(PED_HOURS[peakI])+'–'+hourLabel(PED_HOURS[peakI]+1)+'</b> เฉลี่ย '
+          + hourSpanLabel(PED_HOURS, peakI)+'</b> เฉลี่ย '
           + fmt(cur.ph[peakI]/n)+' คน</div>', '#12A374')
     +   panel('ยอดเฉลี่ยตามวันในสัปดาห์',
           svgBars(dowAvg.map(function(x){ return { l:x.l, v:x.v }; }), { w:340, h:150, color:'#DB6E2C' })
@@ -6765,7 +6975,11 @@ async function exportPptx(btn){
   try{
     var pptx = new PptxGenJS();
     pptx.layout = 'LAYOUT_16x9';
-    var stageCount = $('a4stage').children.length;
+    /* นับจาก #a4wrap ไม่ใช่ #a4stage — renderReport ห่อทุกหน้าไว้ใน a4wrap อีกชั้น
+       ถ้านับจาก a4stage จะได้ 1 เสมอ แล้ว PPTX จะมีแค่สไลด์แรกโดยไม่มี error ให้เห็น */
+    var wrap = $('a4wrap');
+    var stageCount = wrap ? wrap.children.length : 0;
+    if(!stageCount) throw new Error('ยังไม่มีหน้ารายงานให้ส่งออก — เปิดหน้า "รายงาน A4" ก่อน');
     for(var i=0;i<stageCount;i++){
       var node = $('a4p'+i).firstElementChild;
       var cv = await nodeToCanvas(node, 2);
@@ -6785,8 +6999,27 @@ function exportTableXlsx(tableId, name){
   var t = $(tableId);
   if(!t){ toast('ไม่พบตารางที่จะส่งออก','err'); return; }
   try{
+    /* คัดลอกตารางมาทำความสะอาดก่อนแปลง ไม่แตะของจริงบนหน้าจอ
+       เหตุผล: เซลล์บนหน้าจอมีป้ายลำดับ (.rank) กับบรรทัดคำอธิบาย (.hint) ปนอยู่
+       ถ้าแปลงตรง ๆ จะได้เซลล์อย่าง "1ประตูซีคอน" และ "1,234 7 ส.ค. 68"
+       ซึ่งเอาไป sum หรือทำ pivot ต่อไม่ได้เลย
+       และตัวเลขที่ผ่าน fmt() มีเครื่องหมายคั่นหลัก Excel จะรับเป็นข้อความ
+       จึงต้องถอดเครื่องหมายคั่นออกให้กลับเป็นตัวเลขจริง */
+    var clone = t.cloneNode(true);
+    clone.querySelectorAll('.rank, .hint, .chip, .no-export').forEach(function(el){ el.remove(); });
+    clone.querySelectorAll('td, th').forEach(function(td){
+      var txt = td.textContent.replace(/\s+/g,' ').trim();
+      /* ตัวเลขล้วน (อาจมีคั่นหลัก ทศนิยม เครื่องหมายลบ หรือ %) → คืนเป็นตัวเลขดิบ */
+      var m = txt.match(/^([+\-−]?)([\d,]+(?:\.\d+)?)\s*%?$/);
+      if(m){
+        var n = m[2].replace(/,/g,'');
+        td.textContent = (m[1]==='-'||m[1]==='−' ? '-' : '') + n;
+      }else{
+        td.textContent = txt;
+      }
+    });
     var wb = XLSX.utils.book_new();
-    var ws = XLSX.utils.table_to_sheet(t, { raw:false });
+    var ws = XLSX.utils.table_to_sheet(clone, { raw:false });
     XLSX.utils.book_append_sheet(wb, ws, safeSheetName(name));
     XLSX.writeFile(wb, 'SBK_'+name+'_'+stamp()+'.xlsx');
     toast('ส่งออก Excel เรียบร้อยแล้ว','ok');
@@ -7466,7 +7699,15 @@ async function boot(){
 var FATAL_COUNT = 0;
 function reportFatal(what, err){
   console.error(what, err);
-  var sp=$('splash'); if(sp){ sp.classList.remove('locked'); sp.classList.add('gone'); }
+  /* ปลดม่านต้องคืนสถานะ LOCKED ด้วย ไม่งั้นระบบพักหน้าจอจะตายถาวรทั้ง session
+     (resetIdle และ lockScreen ต่างก็มี guard ว่า "ถ้า LOCKED อยู่ให้ออก")
+     เคสจริง: ม่านขึ้นอยู่ → auto-sync เบื้องหลังพัง → ม่านหาย ข้อมูลโผล่ และล็อกอีกไม่ได้ */
+  var sp=$('splash');
+  if(sp){ sp.classList.remove('locked'); sp.classList.add('gone'); }
+  if(typeof LOCKED !== 'undefined' && LOCKED){
+    LOCKED = false;
+    try{ resetIdle(); }catch(e){}
+  }
   if(FATAL_COUNT++ >= 3) return;
   var msg = (err && err.message) ? err.message : String(err||'ไม่ทราบสาเหตุ');
   toast('เกิดข้อผิดพลาดที่ไม่คาดคิด: '+msg+' — ถ้าหน้าจอผิดปกติ ให้กดโหลดข้อมูลใหม่ หรือรีเฟรชหน้าเว็บ','err',12000);
