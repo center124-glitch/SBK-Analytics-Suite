@@ -1285,7 +1285,7 @@ html{ -webkit-text-size-adjust:100%; text-size-adjust:100% }
    ส่วนที่ 1 · ค่าคงที่ และเครื่องมือพื้นฐาน
 ============================================================================ */
 
-var APP_VERSION = '3.3';
+var APP_VERSION = '3.4';
 
 /* โลโก้ Seacon Bangkae ฝังเป็น data URL — ไฟล์เดียวจบ ไม่ต้องแนบรูปแยก
    มี 2 ชุด: ชุดสีเดิมสำหรับพื้นสว่าง/รายงาน และชุดตัวอักษรสีขาวสำหรับพื้นมืด */
@@ -1425,9 +1425,22 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 
 /* ตัวเลข: คั่นหลักพันแบบไทยเสมอ และไม่ปล่อย NaN/Infinity หลุดไปหน้าจอ */
-function fmt(n){ return Number.isFinite(n) ? Math.round(n).toLocaleString('th-TH') : '—'; }
-function fmt1(n){ return Number.isFinite(n) ? n.toLocaleString('th-TH',{minimumFractionDigits:1,maximumFractionDigits:1}) : '—'; }
-function fmtPct(n){ return Number.isFinite(n) ? (n>0?'+':'')+n.toLocaleString('th-TH',{maximumFractionDigits:1})+'%' : '—'; }
+/* ตัวจัดรูปแบบตัวเลขทั้งสามตัวต้องกัน "ลบศูนย์" หลุดออกไปถึงหน้าจอ
+   Math.round(-0.4) ได้ -0 ซึ่ง toLocaleString แสดงเป็น "-0"
+   และค่าอย่าง -0.04 เมื่อปัดเหลือทศนิยม 1 ตำแหน่งจะได้ "-0.0" / "-0%"
+   ผู้ใช้อ่านแล้วเข้าใจว่า "ลดลง" ทั้งที่ความจริงคือเท่าเดิม
+   วิธีแก้: บวก 0 เพื่อพลิก -0 เป็น +0 และตัดค่าที่ปัดแล้วเป็นศูนย์ให้เป็นศูนย์จริง */
+function fmt(n){ return Number.isFinite(n) ? (Math.round(n) + 0).toLocaleString('th-TH') : '—'; }
+function fmt1(n){
+  if(!Number.isFinite(n)) return '—';
+  var v = Math.round(n*10)/10 + 0;
+  return v.toLocaleString('th-TH',{minimumFractionDigits:1,maximumFractionDigits:1});
+}
+function fmtPct(n){
+  if(!Number.isFinite(n)) return '—';
+  var v = Math.round(n*10)/10 + 0;
+  return (v>0?'+':'')+v.toLocaleString('th-TH',{maximumFractionDigits:1})+'%';
+}
 /* หารอย่างปลอดภัย — ตัวหารเป็น 0 ต้องได้ null ไม่ใช่ Infinity/NaN */
 function safeDiv(a,b){ return (!Number.isFinite(a)||!Number.isFinite(b)||b===0) ? null : a/b; }
 function pctChange(cur, prev){
@@ -1448,7 +1461,13 @@ function clamp(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); }
 /* ---- วันที่ (ระบบใช้ ISO ภายใน แต่แสดงผลเป็น พ.ศ. เสมอ) ---- */
 /* ตรวจรูปแบบก่อนเสมอ — ค่าที่มาจาก <input type=date> หรือไฟล์ต้นทางอาจว่าง/เพี้ยนได้
    ถ้าปล่อยให้ Invalid Date หลุดเข้าไป จะกลายเป็น NaN แล้วลามไปทั้งหน้าโดยไม่มี error ให้เห็น */
-var ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+/* ต้องตรวจ "ช่วงของเลขเดือนและวัน" ด้วย ไม่ใช่แค่รูปแบบ 4-2-2
+   เดิม /^\d{4}-\d{2}-\d{2}$/ ปล่อย '2026-13-01' และ '2026-02-99' ผ่าน
+   แล้ว thDate() ไปหยิบ TH_MON_ABBR[12] ซึ่งไม่มี ได้ป้ายว่า "1 undefined 2569"
+   ออกหน้าจอ · isIso ถูกใช้เป็นด่านตรวจ "วันที่นี้ใช้ได้ไหม" ทั่วทั้งแอป
+   การรัดกุมที่นี่จุดเดียวจึงกันปัญหาให้ทุกจุดที่เรียกใช้พร้อมกัน
+   (วันที่ 31 ในเดือนที่มี 30 วันยังผ่าน RegExp ได้ toDate() เป็นด่านถัดไป) */
+var ISO_RE = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
 function isIso(v){ return typeof v==='string' && ISO_RE.test(v); }
 function toDate(iso){
   if(!isIso(iso)) return null;
@@ -1461,6 +1480,9 @@ function beYear(iso){ var y=parseInt(String(iso).slice(0,4),10); return Number.i
 function thDate(iso, style){
   if(!isIso(iso)) return '—';
   var d=+iso.slice(8,10), m=+iso.slice(5,7)-1, be=beYear(iso);
+  /* ป้องกันซ้ำอีกชั้น เผื่อมีใครเรียก thDate ตรง ๆ โดยข้าม isIso ในอนาคต
+     ปล่อยให้ TH_MON_ABBR[m] เป็น undefined แล้วต่อสตริงคือความผิดพลาดที่เงียบที่สุด */
+  if(!(m>=0 && m<12)) return String(iso);
   if(style==='short') return d+' '+TH_MON_ABBR[m]+' '+String(be).slice(2);
   if(style==='medium') return d+' '+TH_MON_ABBR[m]+' '+be;
   return d+' '+TH_MON_FULL[m]+' '+be;
@@ -1476,6 +1498,53 @@ function thMonthShort(ym){
   if(!(m>=0 && m<12)) return String(ym);
   return TH_MON_ABBR[m]+' '+String(+p[0]+543).slice(2);
 }
+/* ชื่อย่อของ "ช่วงวันที่" — ใช้แทนคำว่า ช่วง A / ช่วง B ทั่วทั้งแอป
+   เหตุผล: ป้าย A/B บังคับให้ผู้ใช้ไปอ่านข้อความข้างเคียงทุกครั้งว่า A คือช่วงไหน
+   ฟังก์ชันนี้เลือกรูปแบบที่ "สั้นที่สุดที่ยังไม่กำกวม" ให้อัตโนมัติ:
+     ทั้งเดือนพอดี      -> "ส.ค. 69"
+     ทั้งปีพอดี         -> "ปี 2569"
+     วันเดียว           -> "16 ส.ค. 69"
+     ในเดือนเดียวกัน    -> "1–15 ส.ค. 69"
+     หลายเดือนเต็ม      -> "ม.ค.–มี.ค. 69"
+     ทั่วไป / ข้ามปี    -> "25 ก.ค. 68–10 ส.ค. 69"                                   */
+function rangeLabel(from, to){
+  if(!isIso(from) || !isIso(to)) return '—';
+  /* กันกรณีสลับหัวท้าย ไม่งั้นได้ป้ายอย่าง "10 ส.ค.–1 ส.ค." ซึ่งอ่านแล้วสับสน */
+  if(from > to){ var sw = from; from = to; to = sw; }
+  var y1=+from.slice(0,4), m1=+from.slice(5,7), d1=+from.slice(8,10);
+  var y2=+to.slice(0,4),   m2=+to.slice(5,7),   d2=+to.slice(8,10);
+  /* ISO_RE ตรวจแค่รูปแบบตัวเลข ยังหลุด "2026-13-01" มาได้ ถ้าเดือนเพี้ยนจะได้ undefined
+     ในป้ายชื่อ จึงถอยไปใช้รูปแบบดิบแทนการแสดงคำว่า undefined ให้ผู้ใช้เห็น */
+  if(!(m1>=1&&m1<=12) || !(m2>=1&&m2<=12)) return from+' – '+to;
+  var be1=y1+543, be2=y2+543;
+  var yy1=String(be1).slice(2), yy2=String(be2).slice(2);
+  var A1=TH_MON_ABBR[m1-1], A2=TH_MON_ABBR[m2-1];
+  /* วันสุดท้ายของเดือน: new Date(y, m, 0) โดย m เป็นฐาน 1 = วันที่ 0 ของเดือนถัดไป
+     วิธีนี้จัดการปีอธิกสุรทินให้เองโดยไม่ต้องเขียนกฎ 4/100/400 */
+  function lastOf(y,m){ return new Date(y, m, 0).getDate(); }
+
+  if(from === to) return d1+' '+A1+' '+yy1;
+  if(y1===y2){
+    if(m1===m2){
+      if(d1===1 && d2===lastOf(y1,m1)) return A1+' '+yy1;      // ทั้งเดือน
+      return d1+'–'+d2+' '+A1+' '+yy1;
+    }
+    if(m1===1 && d1===1 && m2===12 && d2===31) return 'ปี '+be1; // ทั้งปี
+    if(d1===1 && d2===lastOf(y2,m2)) return A1+'–'+A2+' '+yy2;   // หลายเดือนเต็ม
+    return d1+' '+A1+'–'+d2+' '+A2+' '+yy2;
+  }
+  if(d1===1 && d2===lastOf(y2,m2)) return A1+' '+yy1+'–'+A2+' '+yy2;
+  return d1+' '+A1+' '+yy1+'–'+d2+' '+A2+' '+yy2;
+}
+
+/* ทำให้ป้ายสองช่วงต่างกันเสมอ — โหมด "กำหนดเอง" ผู้ใช้ตั้งช่วงซ้ำกันได้
+   ถ้าปล่อยให้ชื่อซ้ำ ตารางจะมีสองคอลัมน์ชื่อเดียวกันซึ่งอ่านไม่ออกว่าอันไหนคืออันไหน */
+function rangeLabelPair(aFrom,aTo,bFrom,bTo){
+  var a = rangeLabel(aFrom,aTo), b = rangeLabel(bFrom,bTo);
+  if(a === b) return { a:'ช่วงที่เลือก', b:'ช่วงเทียบ' };
+  return { a:a, b:b };
+}
+
 function ymOf(iso){ return String(iso).slice(0,7); }
 function addDays(iso,n){ var d=toDate(iso); if(!d) return null; d.setDate(d.getDate()+n); return isoOf(d); }
 function isoOf(d){
@@ -1493,7 +1562,28 @@ var HOLIDAY_YEARS = (function(){
   return ys.length ? { from:Math.min.apply(null,ys), to:Math.max.apply(null,ys) } : { from:0, to:0 };
 })();
 function holidayName(iso){ return TH_HOLIDAYS[iso]||''; }
-function hourLabel(h){ return String(h).padStart(2,'0')+':00'; }
+/* ต้องกันค่าที่ไม่ใช่ตัวเลข — densityAvg/densityOfDay คืน peakHour เป็น null
+   เมื่อไม่มีข้อมูลรายชั่วโมงเลย เดิมจะได้ป้ายว่า "null:00" โผล่บนการ์ด KPI */
+function hourLabel(h){
+  if(!Number.isFinite(h)) return '—';
+  return String(h).padStart(2,'0')+':00';
+}
+
+/* สัดส่วนเป็นเปอร์เซ็นต์ — ห้ามเขียน safeDiv(a,b)*100 เพราะ null*100 === 0 ใน JS
+   ทำให้ "ไม่มีข้อมูลให้หาร" ถูกแสดงเป็น 0.0% ซึ่งอ่านได้ว่า "มีข้อมูลและเท่ากับศูนย์"
+   คนละความหมายกันคนละทาง */
+function pctOf(part, whole){
+  var r = safeDiv(part, whole);
+  return r === null ? null : r * 100;
+}
+
+/* ผลต่างของตัวเลขสองตัวที่ "แสดงแบบปัดเศษแล้ว" ต้องคำนวณจากค่าที่ปัดแล้วด้วย
+   ไม่งั้นตารางจะมีแถวอย่าง 1,001 − 999 = 1 (ค่าจริง 1000.6 − 999.4 = 1.2)
+   ผู้ใช้เอาสองคอลัมน์ที่เห็นมาลบกันเองแล้วไม่ตรงกับคอลัมน์ผลต่าง */
+function diffRounded(a, b){
+  if(!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  return (Math.round(a) - Math.round(b)) + 0;
+}
 
 /* ---- ป้ายเปลี่ยนแปลง (ขึ้น/ลง) ---- */
 function chipPct(p){
@@ -2938,9 +3028,36 @@ function aggregate(days, floorFilter){
   out.avgOut  = safeDiv(out.custOut, out.n);
   out.avgCar  = safeDiv(out.carIn,   out.n);
   out.avgCarOut = safeDiv(out.carOut, out.n);
-  // ยอดคนต่อคัน — ตัวชี้วัดว่ารถ 1 คันพาลูกค้าเข้ามากี่คน (ใช้วางแผนที่จอดรถ)
-  out.perCar  = safeDiv(out.custIn, out.carIn);
+  /* ยอดคนต่อคัน — ตัวชี้วัดว่ารถ 1 คันพาลูกค้าเข้ามากี่คน (ใช้วางแผนที่จอดรถ)
+     เมื่อกรองชั้น: ตัวเศษ (ลูกค้า) ถูกกรองเหลือเฉพาะชั้นนั้น แต่ตัวส่วน (รถยนต์)
+     ไม่มีข้อมูลชั้นเลยจึงเป็นยอดทั้งศูนย์เสมอ — หารกันแล้วได้ตัวเลขที่ต่ำกว่าความจริง
+     หลายเท่า (เช่น 2.5 กลายเป็น 0.5) และไม่ได้แปลว่าอะไรทั้งสิ้น
+     จึงคืน null ให้หน้าจอแสดง "—" พร้อมคำอธิบาย ดีกว่าแสดงตัวเลขที่ผิด */
+  out.floorFiltered = !!byFloor;
+  out.perCar  = byFloor ? null : safeDiv(out.custIn, out.carIn);
   return out;
+}
+
+/* ---- ตัวช่วยระดับ "วัน" ที่รู้จักตัวกรองชั้น ----
+   หลายหน้า (heatmap, ตารางประเภทวัน, ชีต Excel รายวัน) วนอ่าน d.s.custIn / d.ph ตรง ๆ
+   ซึ่งเป็นยอด "ทั้งศูนย์" เสมอ ทำให้หน้าเดียวกันมีทั้งตัวเลขที่กรองชั้นแล้วและยังไม่กรอง
+   ปนกัน — ไฟล์ Excel ไฟล์เดียวเคยมียอดรวมสองค่าที่ขัดกันเองด้วยเหตุนี้
+   ใช้ฟังก์ชันชุดนี้แทนการอ่านฟิลด์ดิบ เพื่อให้ทุกจุดใช้นิยามเดียวกัน                         */
+function dayCustIn(d, floor){
+  if(!d) return 0;
+  return (floor && floor!=='all') ? sumGatesByFloor(d,'pk','pi','pn',floor) : (d.s.custIn||0);
+}
+function dayCustOut(d, floor){
+  if(!d) return 0;
+  return (floor && floor!=='all') ? sumGatesByFloor(d,'pok','po','pno',floor) : (d.s.custOut||0);
+}
+function dayPh(d, floor){
+  var t = zeros(PED_HOURS.length);
+  if(!d) return t;
+  if(floor && floor!=='all'){ addFloorHours(t, d, 'pk', 'gpi', floor); return t; }
+  var src = d.ph || [];
+  for(var i=0;i<t.length;i++) t[i] = src[i]||0;
+  return t;
 }
 
 function accGates(acc, d, keyArr, nameArr, valArr, floorFilter){
@@ -2977,6 +3094,28 @@ function addFloorHours(target, d, keyArr, hourArr, floor){
 function gateList(obj){
   return Object.keys(obj).map(function(k){ return obj[k]; })
          .sort(function(a,b){ return b.total-a.total; });
+}
+
+/* ค่าเฉลี่ยต่อวันของประตูหนึ่ง ๆ — ต้องหารด้วย "จำนวนวันของช่วงที่เลือก" (n)
+   ไม่ใช่ g.days ซึ่งคือจำนวนวันที่ประตูนั้นมีข้อมูลปรากฏในไฟล์
+
+   เหตุผลที่ g.days ผิด 2 ข้อ:
+   1) คอลัมน์ "เฉลี่ย/วัน" จะบวกกันไม่เท่ากับแถวรวมท้ายตาราง เพราะแต่ละแถวใช้ตัวหาร
+      คนละตัว ส่วนแถวรวมหารด้วย n — ผู้ใช้เอาตัวเลขไปบวกเองแล้วไม่ตรง
+   2) ประตูที่เพิ่งเปิดกลางเดือน (มีข้อมูล 3 วันจาก 30) จะแสดงค่าเฉลี่ยเท่ากับ
+      ประตูที่เปิดทั้งเดือน ทำให้ตอนเทียบสองช่วงเห็น +11% ทั้งที่ความจริง +233%
+   g.days ยังมีประโยชน์ในฐานะ "ความครบของข้อมูล" จึงแสดงเป็นหมายเหตุใต้ตัวเลขแทน */
+function gateAvg(g, n){
+  if(!g || !Number.isFinite(n) || n <= 0) return null;
+  return safeDiv(g.total, n);
+}
+
+/* หมายเหตุใต้ตัวเลข บอกว่าประตูนี้มีข้อมูลไม่ครบทุกวันของช่วง
+   แสดงเฉพาะตอนที่ไม่ครบจริง ๆ เพื่อไม่ให้ตารางรกโดยไม่จำเป็น */
+function gateCoverNote(g, n){
+  if(!g || !Number.isFinite(n) || n <= 0) return '';
+  if(!Number.isFinite(g.days) || g.days >= n) return '';
+  return '<div class="hint">มีข้อมูล '+g.days+'/'+n+' วัน</div>';
 }
 
 
@@ -3024,7 +3163,8 @@ function densityOfDay(d, mode){
   for(var q=0;q<grid.length;q++){ if((inArr[q]||0)>0 || (outArr[q]||0)>0){ res.hasData = true; break; } }
   var mx = -Infinity, mi = -1;
   res.values.forEach(function(v,i){ if(v>mx){ mx=v; mi=i; } });
-  if(mi>=0){ res.peak = mx; res.peakHour = DENS_HOURS[mi]; }
+  /* เหตุผลเดียวกับ densityAvg: ค่าสูงสุด 0 = ไม่มีข้อมูล ไม่ใช่ชั่วโมงแรกของวัน */
+  if(mi>=0 && mx>0){ res.peak = mx; res.peakHour = DENS_HOURS[mi]; }
   return res;
 }
 
@@ -3051,8 +3191,14 @@ function densityAvg(days, mode){
   var vals = acc.map(function(v){ return v/counted; });
   var mx=-Infinity, mi=-1;
   vals.forEach(function(v,i){ if(v>mx){ mx=v; mi=i; } });
+  /* ค่าสูงสุดเป็น 0 (หรือติดลบ) แปลว่า "ไม่มีคนอยู่ในศูนย์เลยทั้งช่วง" ซึ่งคือ
+     ไม่มีข้อมูล ไม่ใช่ "หนาแน่นที่สุดตอน 11:00" — เดิมคืน DENS_HOURS[0] เสมอ
+     ทำให้การ์ด KPI และรายงานประกาศชั่วโมงที่แน่นที่สุดอย่างมั่นใจบนข้อมูลว่าง
+     คืน null เพื่อให้ทุกจุดที่ใช้ค่านี้แสดง "—" ผ่าน hourLabel/fmt */
+  var hasPeak = mi>=0 && mx>0;
   return { hours:DENS_HOURS.slice(), values:vals, base:baseSum/counted,
-           peak:mx, peakHour:DENS_HOURS[mi], n:counted, skipped:days.length-counted };
+           peak: hasPeak ? mx : null, peakHour: hasPeak ? DENS_HOURS[mi] : null,
+           n:counted, skipped:days.length-counted };
 }
 
 /* ความหนาแน่นรายประตู — ใช้ข้อมูลรายชั่วโมงแยกประตูจาก backend
@@ -3364,11 +3510,18 @@ function analyzeQuality(days, dupes){
     }
   });
 
-  // 8) ยอดออกมากกว่ายอดเข้าเกิน 25% — ผิดปกติเชิงตรรกะสำหรับศูนย์การค้า
+  /* 8) ยอดออกต่างจากยอดเข้าเกิน 25% — ผิดปกติเชิงตรรกะสำหรับศูนย์การค้า
+     เกณฑ์ต้องสมมาตรและตรงกับข้อความที่แสดงบนหน้าคุณภาพข้อมูลเป๊ะ ๆ
+     เดิมใช้ 1.25 กับ 0.6 (คือ "สูงเกิน 25%" แต่ "ต่ำเกิน 40%") ขณะที่หน้าจอเขียนว่า 25%
+     ทั้งสองทาง — ผู้ใช้ที่นับตามคำอธิบายเองจะได้จำนวนวันไม่ตรงกับที่ระบบแจ้ง */
+  var OUT_IN_TOL = 0.25;
   days.forEach(function(d){
     if(d.blank || !d.s.custIn) return;
     var r = d.s.custOut / d.s.custIn;
-    if(r > 1.25 || r < 0.6) q.outOfOrder.push({ date:d.d, custIn:d.s.custIn, custOut:d.s.custOut, ratio:r });
+    if(!Number.isFinite(r)) return;
+    if(r > 1 + OUT_IN_TOL || r < 1 - OUT_IN_TOL){
+      q.outOfOrder.push({ date:d.d, custIn:d.s.custIn, custOut:d.s.custOut, ratio:r });
+    }
   });
 
   /* 9) ความครบถ้วนรายเดือน — ตอบคำถาม "เดือนล่าสุดข้อมูลครบหรือยัง" ได้ทันที
@@ -3504,12 +3657,17 @@ function buildInsights(cur, prev, days){
   var peakIdx = -1, peakVal = -1;
   cur.ph.forEach(function(v,i){ if(v>peakVal){ peakVal=v; peakIdx=i; } });
   if(peakIdx>=0 && peakVal>0){
-    var share = safeDiv(peakVal, sum(cur.ph));
+    /* peakVal เป็นยอดรวมทั้งช่วง ไม่ใช่ยอดของวันเดียว
+       เดิมเขียนว่า "มีลูกค้าเข้า X คนในช่วงนี้ คิดเป็น Y% ของทั้งวัน" ซึ่งปนสองหน่วย
+       (X = รวมทั้งช่วง แต่ "ของทั้งวัน" ชวนให้อ่านว่าเป็นวันเดียว)
+       จึงแปลงเป็นค่าเฉลี่ยต่อวันให้ทั้งประโยคใช้หน่วยเดียวกัน */
+    var share = pctOf(peakVal, sum(cur.ph));
+    var peakPerDay = safeDiv(peakVal, cur.n);
     out.push({
       kind:'info',
       title:'ชั่วโมงเร่งด่วนคือ '+hourSpanLabel(PED_HOURS, peakIdx),
-      body:'มีลูกค้าเข้า '+fmt(peakVal)+' คนในช่วงนี้ คิดเป็น '+
-           (share!==null? fmt1(share*100)+'%' : '—')+' ของทั้งวัน'
+      body:'เฉลี่ยมีลูกค้าเข้า '+fmt(peakPerDay)+' คน/วันในช่วงเวลานี้ คิดเป็น '+
+           (share!==null? fmt1(share)+'%' : '—')+' ของยอดทั้งวัน'
     });
   }
 
@@ -3522,15 +3680,25 @@ function buildInsights(cur, prev, days){
       kind:'info',
       title:'ประตูที่คนใช้มากที่สุด: '+bareGate(top.name),
       body:'รับลูกค้า '+fmt(top.total)+' คน ('+ (sh!==null? fmt1(sh*100)+'%' : '—') +' ของทั้งหมด) '+
-           'เฉลี่ย '+fmt(safeDiv(top.total, top.days))+' คน/วัน — จุดนี้ควรมี รปภ. ประจำและตรวจความสะอาดถี่กว่าจุดอื่น'
+           'เฉลี่ย '+fmt(gateAvg(top, cur.n))+' คน/วัน — จุดนี้ควรมี รปภ. ประจำและตรวจความสะอาดถี่กว่าจุดอื่น'
     });
     // ประตูที่แทบไม่มีคนใช้ — ข้อมูลสำหรับพิจารณาปรับจุดประจำการ
-    var quiet = gl.filter(function(g){ return g.days>=Math.max(3, cur.n*0.5); }).slice(-1)[0];
+    /* ต้อง "เลือก" ประตูที่เงียบที่สุดด้วยเกณฑ์เดียวกับตัวเลขที่เอาไปแสดง
+       gl เรียงตามยอดรวม การหยิบตัวท้ายจึงได้ประตูที่ "ยอดรวม" น้อยที่สุด
+       แต่ข้อความบอกค่า "เฉลี่ย/วัน" — ประตูที่เพิ่งเปิดปลายเดือนจะยอดรวมน้อยที่สุด
+       ทั้งที่ค่าเฉลี่ยต่อวันอาจสูงกว่าประตูอื่นหลายเท่า */
+    var quietPool = gl.filter(function(g){ return g.days>=Math.max(3, cur.n*0.5); });
+    var quiet = null, quietAvg = null;
+    quietPool.forEach(function(g){
+      var a = gateAvg(g, cur.n);
+      if(a===null) return;
+      if(quietAvg===null || a < quietAvg){ quietAvg = a; quiet = g; }
+    });
     if(quiet && quiet.key!==top.key){
       out.push({
         kind:'warn',
         title:'ประตูที่คนใช้น้อยที่สุด: '+bareGate(quiet.name),
-        body:'เฉลี่ยเพียง '+fmt(safeDiv(quiet.total, quiet.days))+' คน/วัน — พิจารณาลดกำลังประจำจุดหรือทบทวนป้ายนำทาง'
+        body:'เฉลี่ยเพียง '+fmt(quietAvg)+' คน/วัน — พิจารณาลดกำลังประจำจุดหรือทบทวนป้ายนำทาง'
       });
     }
   }
@@ -3942,7 +4110,9 @@ function renderOverview(){
               sub: cur.peak ? thDateDow(cur.peak.d) : '—' }),
     kpiCard({ grad:'g-amber', icon:ICON.ratio, label:'ลูกค้าต่อรถ 1 คัน',
               value: cur.perCar!==null ? fmt1(cur.perCar) : '—', unit:'คน/คัน',
-              sub:'รถเข้าเฉลี่ย '+fmt(cur.avgCar)+' คัน/วัน' }),
+              /* ตอนกรองชั้นจะเป็น "—" เพราะข้อมูลรถไม่มีชั้น เทียบกับลูกค้าเฉพาะชั้นไม่ได้ */
+              sub: cur.floorFiltered ? 'เทียบไม่ได้ตอนกรองชั้น (ข้อมูลรถไม่มีชั้น)'
+                                     : 'รถเข้าเฉลี่ย '+fmt(cur.avgCar)+' คัน/วัน' }),
     kpiCard({ grad:'g-slate', icon:ICON.moto, label:'จยย. · แท็กซี่ · เดลิเวอรี่',
               value: fmt(cur.moto+cur.taxi+cur.deli), unit:'ครั้ง',
               sub:'จยย. '+fmt(cur.moto)+' · แท็กซี่ '+fmt(cur.taxi)+' · เดลิฯ '+fmt(cur.deli) })
@@ -3957,7 +4127,7 @@ function renderOverview(){
     return '<tr><td><span class="rank'+(i<3?' top':'')+'">'+(i+1)+'</span>'+esc(bareGate(g.name))+
            ' <span style="color:var(--faint);font-size:11.5px">'+esc(g.floor)+'</span></td>'
       + '<td class="num">'+fmt(g.total)+'</td>'
-      + '<td class="num">'+fmt(safeDiv(g.total,g.days))+'</td>'
+      + '<td class="num">'+fmt(gateAvg(g,cur.n))+gateCoverNote(g,cur.n)+'</td>'
       + '<td><div class="flex items-center gap-2 justify-end"><span class="num" style="min-width:44px">'+(share!==null?fmt1(share*100)+'%':'—')+'</span>'
       + '<div class="bar" style="width:70px"><i style="width:'+(glMax? Math.round(g.total/glMax*100):0)+'%"></i></div></div></td></tr>';
   }).join('');
@@ -4154,12 +4324,12 @@ function renderGates(){
     var av, bv;
     if(k==='name'){ av=a.name; bv=b.name; return dir*String(av).localeCompare(String(bv),'th'); }
     if(k==='floor'){ return dir*(floorRank(a.floor)-floorRank(b.floor)); }
-    if(k==='avg'){ av=safeDiv(a.total,a.days)||0; bv=safeDiv(b.total,b.days)||0; }
+    if(k==='avg'){ av=gateAvg(a,cur.n)||0; bv=gateAvg(b,cur.n)||0; }
     else if(k==='out'){ av=(cur.gateOut[a.key]||{}).total||0; bv=(cur.gateOut[b.key]||{}).total||0; }
     else if(k==='chg'){
       /* ห้ามใช้ || เพราะ 0% (ยอดเท่าเดิมเป๊ะ) จะถูกตีเป็น "ไม่มีค่า" แล้วถูกดันไปท้ายสุด
          ทั้งที่ควรอยู่กลางตารางระหว่างประตูที่เพิ่มขึ้นกับที่ลดลง */
-      var ca = gateChange(a,prev), cb = gateChange(b,prev);
+      var ca = gateChange(a,prev,cur.n), cb = gateChange(b,prev,cur.n);
       av = Number.isFinite(ca) ? ca : -1e9;
       bv = Number.isFinite(cb) ? cb : -1e9;
     }
@@ -4171,12 +4341,12 @@ function renderGates(){
   var rows = sorted.map(function(g,i){
     var share = safeDiv(g.total, total);
     var outT  = (cur.gateOut[g.key]||{}).total;
-    var chg   = gateChange(g, prev);
+    var chg   = gateChange(g, prev, cur.n);
     return '<tr>'
       + '<td><span class="rank'+(i<3&&STATE.gateSort.key==='total'&&STATE.gateSort.dir===-1?' top':'')+'">'+(i+1)+'</span>'+esc(bareGate(g.name))+'</td>'
       + '<td style="text-align:left">'+esc(g.floor)+'</td>'
       + '<td class="num">'+fmt(g.total)+'</td>'
-      + '<td class="num">'+fmt(safeDiv(g.total,g.days))+'</td>'
+      + '<td class="num">'+fmt(gateAvg(g,cur.n))+gateCoverNote(g,cur.n)+'</td>'
       + '<td class="num">'+(Number.isFinite(outT)?fmt(outT):'—')+'</td>'
       + '<td class="num">'+fmt(g.max)+'<div class="hint">'+(g.maxDate?thDate(g.maxDate,'short'):'')+'</div></td>'
       + '<td>'+chipPct(chg)+'</td>'
@@ -4194,9 +4364,10 @@ function renderGates(){
     + kpiCard({ grad:'g-emerald', icon:ICON.people, label:'ยอดรวมทุกประตู', value:fmt(total), unit:'คน',
                 sub:'เฉลี่ย '+fmt(safeDiv(total, cur.n))+' คน/วัน' })
     + kpiCard({ grad:'g-rose', icon:ICON.peak, label:'ประตูอันดับ 1', value:esc(bareGate(inList[0].name)), unit:'',
-                sub: fmt(inList[0].total)+' คน · '+(safeDiv(inList[0].total,total)!==null?fmt1(safeDiv(inList[0].total,total)*100)+'%':'—') })
+                sub: fmt(inList[0].total)+' คน · '+(function(p){ return p===null?'—':fmt1(p)+'%'; })(pctOf(inList[0].total, total)) })
     + kpiCard({ grad:'g-amber', icon:ICON.ratio, label:'ความกระจุกตัว 5 ประตูแรก',
-                value: fmt1(safeDiv(sum(inList.slice(0,5).map(function(g){return g.total;})), total)*100), unit:'%',
+                /* pctOf กัน null*100 === 0 ที่ทำให้ "ไม่มีข้อมูล" กลายเป็น 0.0% */
+                value: fmt1(pctOf(sum(inList.slice(0,5).map(function(g){return g.total;})), total)), unit:'%',
                 sub:'ยิ่งสูง ยิ่งควรกระจายคนไปประตูอื่น' })
     + '</div>'
 
@@ -4265,10 +4436,15 @@ function renderGates(){
   });
 }
 
-function gateChange(g, prev){
+/* เปอร์เซ็นต์เปลี่ยนแปลงของประตูหนึ่ง เทียบช่วงปัจจุบันกับช่วงก่อนหน้า
+   ต้องหารด้วยจำนวนวันของแต่ละช่วง (curN / prev.n) ไม่ใช่ g.days / p.days
+   ไม่งั้นประตูที่ปีนี้เปิดครบเดือนแต่ปีก่อนเปิดแค่ 3 วัน จะดูเหมือนแทบไม่โต */
+function gateChange(g, prev, curN){
+  if(!g || !prev) return null;
   var p = prev.gateIn[g.key];
-  if(!p || !p.days || !g.days) return null;
-  return pctChange(safeDiv(g.total,g.days), safeDiv(p.total,p.days));
+  if(!p) return null;
+  if(!Number.isFinite(curN) || curN<=0 || !Number.isFinite(prev.n) || prev.n<=0) return null;
+  return pctChange(gateAvg(g,curN), gateAvg(p,prev.n));
 }
 /* ============================================================================
    ส่วนที่ 18 · หน้า "ความหนาแน่นรายชั่วโมง"
@@ -4307,7 +4483,9 @@ function renderIntensity(){
                    .filter(function(x){ return Number.isFinite(x.peak); })
                    .sort(function(a,b){ return b.peak-a.peak; });
 
-  var peakHourIdx = dens.values.indexOf(Math.max.apply(null, dens.values));
+  /* เช่นเดียวกับหน้ารายชั่วโมง: ค่าสูงสุดเป็น 0 แปลว่าไม่มีข้อมูล ไม่ใช่ "แน่นที่สุดตอน 11:00" */
+  var densMax     = dens.values.length ? Math.max.apply(null, dens.values) : 0;
+  var peakHourIdx = densMax > 0 ? dens.values.indexOf(densMax) : -1;
 
   host.innerHTML =
       '<div class="card"><div class="card-b flex flex-wrap items-center gap-3">'
@@ -4329,9 +4507,13 @@ function renderIntensity(){
                 value: fmt(avg(dens.values)), unit:M.unit, sub:'เฉลี่ยตลอด 11:00–22:00' })
     + kpiCard({ grad:'g-amber', icon:ICON.ratio,
                 label: mode==='c' ? 'รถค้างก่อนห้างเปิด (เฉลี่ย)' : 'ช่วงเวลาที่คนแน่นที่สุด',
-                value: mode==='c' ? fmt(dens.base) : hourLabel(DENS_HOURS[Math.max(0,peakHourIdx)]),
-                unit: mode==='c' ? 'คัน' : 'น.',
-                sub: mode==='c' ? 'ยอดสุทธิสะสม 01:00–10:00' : 'ควรเสริมกำลังก่อนเวลานี้ 1 ชั่วโมง' })
+                /* peakHourIdx เป็น -1 ได้เมื่อไม่มีข้อมูล เดิม Math.max(0,-1) ดันให้เป็น 0
+                   แล้วรายงานชั่วโมงแรกของวันว่าเป็นช่วงที่แน่นที่สุด ทั้งที่ไม่มีข้อมูลเลย */
+                value: mode==='c' ? fmt(dens.base)
+                                  : (peakHourIdx>=0 ? hourLabel(DENS_HOURS[peakHourIdx]) : '—'),
+                unit: mode==='c' ? 'คัน' : (peakHourIdx>=0 ? 'น.' : ''),
+                sub: mode==='c' ? 'ยอดสุทธิสะสม 01:00–10:00'
+                                : (peakHourIdx>=0 ? 'ควรเสริมกำลังก่อนเวลานี้ 1 ชั่วโมง' : 'ไม่มีข้อมูลรายชั่วโมง') })
     + '</div>'
 
     + '<div class="mt-4">'
@@ -4514,16 +4696,26 @@ function renderHourly(){
   var avgVh = cur.vh.map(function(v){ return v/n; });
   var avgVo = cur.vho.map(function(v){ return v/n; });
 
-  var peakI = avgPh.indexOf(Math.max.apply(null, avgPh));
-  var totPh = sum(avgPh);
+  /* ถ้าทุกชั่วโมงเป็นศูนย์ (เช่น ช่วงที่เลือกมีแต่วันที่ยังไม่คีย์ข้อมูล)
+     indexOf(0) จะคืน 0 แล้วหน้าจอจะประกาศว่า "ชั่วโมงเร่งด่วนที่สุดคือ 10:00"
+     อย่างมั่นใจทั้งที่ไม่มีข้อมูลอะไรเลย — ต้องแยกกรณีนี้ออกมาเป็น "—" */
+  var peakMax = avgPh.length ? Math.max.apply(null, avgPh) : 0;
+  var peakI   = peakMax > 0 ? avgPh.indexOf(peakMax) : -1;
+  var totPh   = sum(avgPh);
+  var vhMax   = avgVh.length ? Math.max.apply(null, avgVh) : 0;
+  var vhI     = vhMax > 0 ? avgVh.indexOf(vhMax) : -1;
 
   // heatmap: วันในสัปดาห์ × ชั่วโมง (ยอดลูกค้าเข้าเฉลี่ย)
   var hm = [];
   for(var w=0; w<7; w++) hm.push(zeros(PED_HOURS.length));
   var cnt = zeros(7);
+  /* ต้องใช้ dayPh เพื่อให้ heatmap ตรงกับ KPI และกราฟอื่นบนหน้าเดียวกันตอนกรองชั้น
+     เดิมอ่าน d.ph ตรง ๆ ซึ่งเป็นยอดทั้งศูนย์เสมอ ทำให้ heatmap ขัดกับตัวเลขข้างบน */
+  var hmFloor = STATE.filter.floor;
   days.forEach(function(d){
     cnt[d.dow]++;
-    for(var h=0;h<PED_HOURS.length;h++) hm[d.dow][h] += (d.ph[h]||0);
+    var ph = dayPh(d, hmFloor);
+    for(var h=0;h<PED_HOURS.length;h++) hm[d.dow][h] += (ph[h]||0);
   });
   for(var w2=0; w2<7; w2++){
     if(cnt[w2]) for(var h2=0;h2<PED_HOURS.length;h2++) hm[w2][h2] /= cnt[w2];
@@ -4547,15 +4739,18 @@ function renderHourly(){
   host.innerHTML =
       '<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">'
     + kpiCard({ grad:'g-indigo', icon:ICON.peak, label:'ชั่วโมงเร่งด่วนที่สุด',
-                value: hourLabel(PED_HOURS[peakI]), unit:'น.',
-                sub:'เฉลี่ย '+fmt(avgPh[peakI])+' คน · '+(totPh?fmt1(avgPh[peakI]/totPh*100):'0')+'% ของทั้งวัน' })
+                value: peakI>=0 ? hourLabel(PED_HOURS[peakI]) : '—', unit: peakI>=0?'น.':'',
+                sub: peakI>=0
+                       ? 'เฉลี่ย '+fmt(avgPh[peakI])+' คน · '
+                         +(function(p){ return p===null ? '—' : fmt1(p)+'%'; })(pctOf(avgPh[peakI], totPh))+' ของยอดทั้งวัน'
+                       : 'ไม่มีข้อมูลรายชั่วโมงในช่วงที่เลือก' })
     + kpiCard({ grad:'g-teal', icon:ICON.people, label:'ลูกค้าเข้าเฉลี่ยต่อชั่วโมง',
                 value: fmt(avg(avgPh)), unit:'คน', sub:'ตลอด 10:00–24:00' })
     + kpiCard({ grad:'g-sky', icon:ICON.car, label:'ชั่วโมงรถเข้าสูงสุด',
-                value: hourLabel(VEH_HOURS[avgVh.indexOf(Math.max.apply(null,avgVh))]), unit:'น.',
-                sub:'เฉลี่ย '+fmt(Math.max.apply(null,avgVh))+' คัน' })
+                value: vhI>=0 ? hourLabel(VEH_HOURS[vhI]) : '—', unit: vhI>=0?'น.':'',
+                sub: vhI>=0 ? 'เฉลี่ย '+fmt(vhMax)+' คัน' : 'ไม่มีข้อมูลรถรายชั่วโมง' })
     + kpiCard({ grad:'g-amber', icon:ICON.ratio, label:'สัดส่วนช่วงเย็น (17:00–21:00)',
-                value: fmt1(safeDiv(sum(avgPh.slice(7,12)), totPh)*100), unit:'%',
+                value: fmt1(pctOf(sum(avgPh.slice(7,12)), totPh)), unit:'%',
                 sub:'ของยอดลูกค้าทั้งวัน' })
     + '</div>'
 
@@ -4591,9 +4786,10 @@ function renderHourly(){
             return '<tr><td>'+hourLabel(h)+' น.</td>'
               + '<td class="num">'+(a===null?'—':fmt(a))+'</td>'
               + '<td class="num">'+(b===null?'—':fmt(b))+'</td>'
-              + '<td class="num">'+(a===null?'—':fmt(a-b))+'</td>'
+              /* ใช้ diffRounded เพื่อให้คอลัมน์ "สุทธิ" เท่ากับผลลบของสองคอลัมน์ที่แสดงจริง */
+              + '<td class="num">'+(a===null||b===null?'—':fmt(diffRounded(a,b)))+'</td>'
               + '<td class="num">'+fmt(c)+'</td><td class="num">'+fmt(e)+'</td>'
-              + '<td class="num">'+fmt(c-e)+'</td></tr>';
+              + '<td class="num">'+fmt(diffRounded(c,e))+'</td></tr>';
           }).join('')
         + '</tbody></table></div>',
         '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblHour\',\'ยอดรายชั่วโมง\')">ส่งออก Excel</button>')
@@ -4640,8 +4836,13 @@ function renderCompare(){
     if(!bFrom || !bTo){ bFrom = aFrom; bTo = aTo; }
     modeLabel = 'ช่วงเดียวกันของปีก่อน (เลื่อน 52 สัปดาห์)';
   } else if(STATE.compare.mode==='custom'){
-    bFrom = STATE.compare.bFrom || addDays(aFrom, -len);
-    bTo   = STATE.compare.bTo   || addDays(aFrom, -1);
+    /* ค่าจากช่อง <input type="date"> ผ่าน bindCompare มาแล้วก็จริง แต่ STATE ยังถูก
+       แก้ได้จากที่อื่น (console, โค้ดในอนาคต) — ถ้าหลุดค่าที่ไม่ใช่ ISO เข้ามา
+       pick() จะเปรียบเทียบสตริงมั่ว ๆ แล้วคืนชุดวันที่ผิดโดยไม่มีสัญญาณเตือนเลย
+       จึงตรวจซ้ำที่นี่ และถอยไปใช้ค่าเริ่มต้นถ้าไม่ผ่าน */
+    bFrom = isIso(STATE.compare.bFrom) ? STATE.compare.bFrom : addDays(aFrom, -len);
+    bTo   = isIso(STATE.compare.bTo)   ? STATE.compare.bTo   : addDays(aFrom, -1);
+    if(isIso(bFrom) && isIso(bTo) && bFrom > bTo){ var sw = bFrom; bFrom = bTo; bTo = sw; }
     modeLabel = 'ช่วงที่กำหนดเอง';
   } else {
     // ใช้ตัวเดียวกับที่การ์ด KPI ใช้ ตัวเลข % บนหน้าภาพรวมกับหน้านี้จะได้ตรงกัน
@@ -4650,6 +4851,21 @@ function renderCompare(){
     bFrom = pr.from; bTo = pr.to;
     modeLabel = pr.label;
   }
+
+  /* addDays คืน null ได้ทุกเส้นทางข้างบน (วันที่พังตั้งแต่ต้น) ถ้าปล่อยผ่าน
+     pick() จะเทียบ d.d < null เป็น false ทุกครั้ง แล้วได้ช่วงเทียบว่างเปล่า
+     โดยผู้ใช้เห็นแค่ "ไม่มีข้อมูล" ทั้งที่ความจริงคือช่วงวันที่คำนวณไม่ได้ */
+  if(!isIso(bFrom) || !isIso(bTo)){
+    host.innerHTML = card('เทียบช่วงเวลา','',
+      emptyState('คำนวณช่วงเปรียบเทียบไม่ได้',
+                 'ช่วงวันที่ที่เลือกอยู่ (' + thDate(aFrom,'medium') + ' – ' + thDate(aTo,'medium') +
+                 ') ทำให้หาช่วงเทียบไม่ได้ — ลองเลือกช่วงวันที่ใหม่จากปุ่มตัวกรอง'));
+    return;
+  }
+
+  /* ป้ายชื่อจริงของแต่ละช่วง ใช้แทน "ช่วง A/B" ทุกจุดในหน้านี้
+     ผู้ใช้จะอ่านหัวตารางแล้วรู้ทันทีว่าเทียบ ส.ค. 69 กับ ก.ค. 69 โดยไม่ต้องเลื่อนไปหาคำอธิบาย */
+  var LB = rangeLabelPair(aFrom, aTo, bFrom, bTo);
 
   function pick(from, to){
     return DATA.days.filter(function(d){
@@ -4663,7 +4879,7 @@ function renderCompare(){
   var B = aggregate(pick(bFrom,bTo), f.floor);
 
   if(!B.n){
-    host.innerHTML = compareControls(aFrom,aTo,bFrom,bTo,modeLabel)
+    host.innerHTML = compareControls(aFrom,aTo,bFrom,bTo,modeLabel,LB)
       + '<div class="mt-4">' + card('ผลการเปรียบเทียบ','',
           emptyState('ไม่มีข้อมูลในช่วงเปรียบเทียบ', thDate(bFrom,'medium')+' – '+thDate(bTo,'medium')+' ไม่มีข้อมูลในระบบ')) + '</div>';
     bindCompare();
@@ -4682,7 +4898,7 @@ function renderCompare(){
   var kpis = metrics.map(function(m){
     var a = safeDiv(A[m.k], A.n), b = safeDiv(B[m.k], B.n);
     return kpiCard({ grad:m.grad, icon:m.icon, label:m.label+' (เฉลี่ย/วัน)',
-                     value:fmt(a), unit:m.unit, delta: deltaText(pctChange(a,b), 'เทียบ '+(STATE.compare.mode==='yoy'?'ปีก่อน':'ช่วงก่อน')) });
+                     value:fmt(a), unit:m.unit, delta: deltaText(pctChange(a,b), 'เทียบ '+LB.b) });
   }).join('');
 
   var rows = metrics.concat([
@@ -4694,7 +4910,7 @@ function renderCompare(){
     return '<tr><td>'+esc(m.label)+'</td>'
       + '<td class="num">'+fmt(aT)+'</td><td class="num">'+fmt(bT)+'</td>'
       + '<td class="num">'+fmt(aA)+'</td><td class="num">'+fmt(bA)+'</td>'
-      + '<td class="num">'+(Number.isFinite(aA)&&Number.isFinite(bA)?fmt(aA-bA):'—')+'</td>'
+      + '<td class="num">'+(diffRounded(aA,bA)===null?'—':fmt(diffRounded(aA,bA)))+'</td>'
       + '<td>'+chipPct(pctChange(aA,bA))+'</td></tr>';
   }).join('');
 
@@ -4702,16 +4918,18 @@ function renderCompare(){
   var gA = gateList(A.gateIn), gMap = B.gateIn;
   var gRows = gA.slice(0,20).map(function(g,i){
     var b = gMap[g.key];
-    var aA = safeDiv(g.total, g.days), bA = b? safeDiv(b.total,b.days) : null;
+    /* หารด้วยจำนวนวันของช่วง (A.n/B.n) ไม่ใช่จำนวนวันที่ประตูนั้นมีข้อมูล
+       ประตูที่เปลี่ยนชื่อกลางช่วงเคยแสดง +11% ทั้งที่ยอดจริงเพิ่ม +233% เพราะเหตุนี้ */
+    var aA = gateAvg(g, A.n), bA = b ? gateAvg(b, B.n) : null;
     return '<tr><td><span class="rank'+(i<3?' top':'')+'">'+(i+1)+'</span>'+esc(bareGate(g.name))+'</td>'
       + '<td style="text-align:left">'+esc(g.floor)+'</td>'
-      + '<td class="num">'+fmt(aA)+'</td>'
-      + '<td class="num">'+(bA===null?'—':fmt(bA))+'</td>'
-      + '<td class="num">'+(bA===null?'—':fmt(aA-bA))+'</td>'
+      + '<td class="num">'+fmt(aA)+gateCoverNote(g,A.n)+'</td>'
+      + '<td class="num">'+(bA===null?'—':fmt(bA)+gateCoverNote(b,B.n))+'</td>'
+      + '<td class="num">'+(diffRounded(aA,bA)===null?'—':fmt(diffRounded(aA,bA)))+'</td>'
       + '<td>'+chipPct(pctChange(aA,bA))+'</td></tr>';
   }).join('');
 
-  host.innerHTML = compareControls(aFrom,aTo,bFrom,bTo,modeLabel)
+  host.innerHTML = compareControls(aFrom,aTo,bFrom,bTo,modeLabel,LB)
     + '<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4 mt-4">'+kpis+'</div>'
 
     + '<div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">'
@@ -4720,10 +4938,10 @@ function renderCompare(){
     + '</div>'
 
     + '<div class="mt-4">'
-    + card('ตารางเปรียบเทียบภาพรวม', 'ช่วง A = '+thDate(aFrom,'medium')+'–'+thDate(aTo,'medium')+' ('+A.n+' วัน) · ช่วง B = '+thDate(bFrom,'medium')+'–'+thDate(bTo,'medium')+' ('+B.n+' วัน)',
+    + card('ตารางเปรียบเทียบภาพรวม', esc(LB.a)+' = '+thDate(aFrom,'medium')+'–'+thDate(aTo,'medium')+' ('+A.n+' วัน) · '+esc(LB.b)+' = '+thDate(bFrom,'medium')+'–'+thDate(bTo,'medium')+' ('+B.n+' วัน)',
         '<div class="tbl-wrap"><table class="tbl" id="tblCmp"><thead><tr>'
-        + '<th class="no-sort">ตัวชี้วัด</th><th class="no-sort">รวม A</th><th class="no-sort">รวม B</th>'
-        + '<th class="no-sort">เฉลี่ย/วัน A</th><th class="no-sort">เฉลี่ย/วัน B</th><th class="no-sort">ผลต่าง/วัน</th><th class="no-sort">เปลี่ยนแปลง</th>'
+        + '<th class="no-sort">ตัวชี้วัด</th><th class="no-sort">รวม '+esc(LB.a)+'</th><th class="no-sort">รวม '+esc(LB.b)+'</th>'
+        + '<th class="no-sort">เฉลี่ย/วัน '+esc(LB.a)+'</th><th class="no-sort">เฉลี่ย/วัน '+esc(LB.b)+'</th><th class="no-sort">ผลต่าง/วัน</th><th class="no-sort">เปลี่ยนแปลง</th>'
         + '</tr></thead><tbody>'+rows+'</tbody></table></div>',
         '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblCmp\',\'เปรียบเทียบช่วงเวลา\')">ส่งออก Excel</button>')
     + '</div>'
@@ -4731,8 +4949,8 @@ function renderCompare(){
     + '<div class="mt-4">'
     + card('เทียบรายประตู (20 อันดับแรก)', 'ค่าเฉลี่ยต่อวัน',
         '<div class="tbl-wrap" style="max-height:520px"><table class="tbl" id="tblCmpGate"><thead><tr>'
-        + '<th class="no-sort">ประตู</th><th class="no-sort">ชั้น</th><th class="no-sort">A (เฉลี่ย/วัน)</th>'
-        + '<th class="no-sort">B (เฉลี่ย/วัน)</th><th class="no-sort">ผลต่าง</th><th class="no-sort">เปลี่ยนแปลง</th>'
+        + '<th class="no-sort">ประตู</th><th class="no-sort">ชั้น</th><th class="no-sort">'+esc(LB.a)+' (เฉลี่ย/วัน)</th>'
+        + '<th class="no-sort">'+esc(LB.b)+' (เฉลี่ย/วัน)</th><th class="no-sort">ผลต่าง</th><th class="no-sort">เปลี่ยนแปลง</th>'
         + '</tr></thead><tbody>'+(gRows||'<tr><td colspan="6" style="text-align:center;color:var(--muted)">ไม่มีข้อมูลรายประตู</td></tr>')+'</tbody></table></div>',
         '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblCmpGate\',\'เทียบรายประตู\')">ส่งออก Excel</button>')
     + '</div>';
@@ -4741,9 +4959,9 @@ function renderCompare(){
   makeChart('chCmpHour','line', {
     labels: PED_HOURS.map(hourLabel),
     datasets:[
-      { label:'ช่วง A', unit:'คน', data:A.ph.map(function(v){ return Math.round(v/nA); }),
+      { label:LB.a, unit:'คน', data:A.ph.map(function(v){ return Math.round(v/nA); }),
         borderColor:tone('blue'), backgroundColor:withAlpha(tone('blue'),.25), fill:true, tension:.34, borderWidth:2.9, pointRadius:2.4 },
-      { label:'ช่วง B', unit:'คน', data:B.ph.map(function(v){ return Math.round(v/nB); }),
+      { label:LB.b, unit:'คน', data:B.ph.map(function(v){ return Math.round(v/nB); }),
         borderColor:tone('gray'), backgroundColor:'transparent', borderDash:[5,4], tension:.34, borderWidth:2, pointRadius:2 }
     ]
   }, {});
@@ -4758,16 +4976,17 @@ function renderCompare(){
   makeChart('chCmpDow','bar', {
     labels: TH_DOW_FULL,
     datasets:[
-      { label:'ช่วง A', unit:'คน', data:dowAvg(A), backgroundColor:tone('blue'), borderRadius:6, maxBarThickness:30 },
-      { label:'ช่วง B', unit:'คน', data:dowAvg(B), backgroundColor:tone('gray'), borderRadius:6, maxBarThickness:30 }
+      { label:LB.a, unit:'คน', data:dowAvg(A), backgroundColor:tone('blue'), borderRadius:6, maxBarThickness:30 },
+      { label:LB.b, unit:'คน', data:dowAvg(B), backgroundColor:tone('gray'), borderRadius:6, maxBarThickness:30 }
     ]
   }, {});
 
   bindCompare();
 }
 
-function compareControls(aFrom,aTo,bFrom,bTo,modeLabel){
+function compareControls(aFrom,aTo,bFrom,bTo,modeLabel,LB){
   var m = STATE.compare.mode;
+  LB = LB || rangeLabelPair(aFrom,aTo,bFrom,bTo);
   return '<div class="card"><div class="card-b">'
     + '<div class="flex flex-wrap items-center gap-3">'
     +   '<div class="seg" id="cmpMode">'
@@ -4781,14 +5000,14 @@ function compareControls(aFrom,aTo,bFrom,bTo,modeLabel){
         ? '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 pt-3 border-t" style="border-color:var(--line)">'
           /* addDays คืน null ได้ ถ้าปล่อยผ่านจะได้ value="null" แล้วเบราว์เซอร์ทิ้งค่า
              ผู้ใช้จะเห็นช่องวันที่ว่างเปล่าโดยไม่รู้ว่าทำไม */
-          + '<div><label class="lb">ช่วง B ตั้งแต่</label><input type="date" class="inp w-full" id="cmpBFrom" value="'+esc(isIso(bFrom)?bFrom:'')+'"></div>'
-          + '<div><label class="lb">ช่วง B ถึง</label><input type="date" class="inp w-full" id="cmpBTo" value="'+esc(isIso(bTo)?bTo:'')+'"></div>'
+          + '<div><label class="lb">ช่วงเทียบ ตั้งแต่</label><input type="date" class="inp w-full" id="cmpBFrom" value="'+esc(isIso(bFrom)?bFrom:'')+'"></div>'
+          + '<div><label class="lb">ช่วงเทียบ ถึง</label><input type="date" class="inp w-full" id="cmpBTo" value="'+esc(isIso(bTo)?bTo:'')+'"></div>'
           + '<div class="flex items-end"><button class="btn btn-primary" id="cmpApply">ใช้ช่วงนี้</button></div>'
           + '</div>'
         : '')
     + '<div class="flex flex-wrap gap-4 mt-3 pt-3 border-t text-[12.5px]" style="border-color:var(--line)">'
-    +   '<div><span style="color:var(--muted)">ช่วง A:</span> <b>'+thDate(aFrom,'medium')+' – '+thDate(aTo,'medium')+'</b></div>'
-    +   '<div><span style="color:var(--muted)">ช่วง B:</span> <b>'+thDate(bFrom,'medium')+' – '+thDate(bTo,'medium')+'</b></div>'
+    +   '<div><span style="color:var(--muted)">'+esc(LB.a)+':</span> <b>'+thDate(aFrom,'medium')+' – '+thDate(aTo,'medium')+'</b></div>'
+    +   '<div><span style="color:var(--muted)">'+esc(LB.b)+':</span> <b>'+thDate(bFrom,'medium')+' – '+thDate(bTo,'medium')+'</b></div>'
     + '</div>'
     + '</div></div>';
 }
@@ -5151,20 +5370,39 @@ function renderGateTrend(){
     var e = avg(early), l = avg(late);
     return { key:g.key, name:g.name, floor:g.floor,
              early:e, late:l, chg:pctChange(l,e),
-             periodAvg: safeDiv(g.total, g.days),
-             prevAvg: prev.gateIn[g.key] ? safeDiv(prev.gateIn[g.key].total, prev.gateIn[g.key].days) : null };
+             /* ทั้งสองค่าต้องหารด้วยจำนวนวันของช่วงตัวเอง (cur.n / prev.n)
+                เดิมหารด้วยจำนวนวันที่ประตูมีข้อมูล ทำให้แถวเดียวกันมีสองนิยาม */
+             /* ประตูที่ครึ่งแรกยังไม่เปิด (early = 0) จะได้ chg = null จาก pctChange
+                แล้วหลุดหายไปจากทั้งตาราง "เพิ่มขึ้น" และ "ลดลง" ทั้งที่เป็นความ
+                เปลี่ยนแปลงที่สำคัญที่สุด — ต้องทำเครื่องหมายไว้แล้วแสดงแยกต่างหาก */
+             isNew: (e===null || e===0) && Number.isFinite(l) && l>0,
+             isGone:(l===null || l===0) && Number.isFinite(e) && e>0,
+             periodAvg: gateAvg(g, cur.n),
+             prevAvg: prev.gateIn[g.key] ? gateAvg(prev.gateIn[g.key], prev.n) : null };
   });
-  var rising  = growth.filter(function(x){ return x.chg!==null && x.chg>0; }).sort(function(a,b){ return b.chg-a.chg; });
-  var falling = growth.filter(function(x){ return x.chg!==null && x.chg<0; }).sort(function(a,b){ return a.chg-b.chg; });
+  /* ประตูเปิดใหม่ถือเป็น "เพิ่มขึ้น" และวางไว้บนสุด (เรียงตามยอดครึ่งหลัง)
+     ประตูที่หยุดใช้งานถือเป็น "ลดลง" ด้วยเหตุผลเดียวกัน */
+  var newOnes  = growth.filter(function(x){ return x.isNew; }).sort(function(a,b){ return (b.late||0)-(a.late||0); });
+  var goneOnes = growth.filter(function(x){ return x.isGone; }).sort(function(a,b){ return (b.early||0)-(a.early||0); });
+  var rising  = newOnes.concat(
+                  growth.filter(function(x){ return !x.isNew && x.chg!==null && x.chg>0; })
+                        .sort(function(a,b){ return b.chg-a.chg; }));
+  var falling = goneOnes.concat(
+                  growth.filter(function(x){ return !x.isGone && x.chg!==null && x.chg<0; })
+                        .sort(function(a,b){ return a.chg-b.chg; }));
 
   host.innerHTML =
       '<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">'
     + kpiCard({ grad:'g-emerald', icon:ICON.peak, label:'ประตูที่โตเร็วที่สุด',
                 value: rising.length ? esc(bareGate(rising[0].name)) : '—', unit:'',
-                sub: rising.length ? fmtPct(rising[0].chg)+' · เฉลี่ย '+fmt(rising[0].late)+' คน/วัน' : 'ไม่มีประตูที่ยอดเพิ่มขึ้น' })
+                sub: rising.length
+                       ? (rising[0].isNew ? 'เปิดใหม่ในช่วงนี้' : fmtPct(rising[0].chg))+' · เฉลี่ย '+fmt(rising[0].late)+' คน/วัน'
+                       : 'ไม่มีประตูที่ยอดเพิ่มขึ้น' })
     + kpiCard({ grad:'g-orange', icon:ICON.out, label:'ประตูที่ลดลงมากที่สุด',
                 value: falling.length ? esc(bareGate(falling[0].name)) : '—', unit:'',
-                sub: falling.length ? fmtPct(falling[0].chg)+' · เฉลี่ย '+fmt(falling[0].late)+' คน/วัน' : 'ไม่มีประตูที่ยอดลดลง' })
+                sub: falling.length
+                       ? (falling[0].isGone ? 'หยุดใช้งานในช่วงนี้' : fmtPct(falling[0].chg))+' · เฉลี่ย '+fmt(falling[0].late)+' คน/วัน'
+                       : 'ไม่มีประตูที่ยอดลดลง' })
     + kpiCard({ grad:'g-indigo', icon:ICON.gate, label:'ประตูที่ยอดเพิ่มขึ้น',
                 value: fmt(rising.length), unit:'ประตู', sub:'จากทั้งหมด '+list.length+' ประตู' })
     + kpiCard({ grad:'g-slate', icon:ICON.ratio, label:'ประตูที่ยอดลดลง',
@@ -5203,7 +5441,9 @@ function renderGateTrend(){
         + growth.sort(function(a,b){ return (b.periodAvg||0)-(a.periodAvg||0); }).map(function(x){
             return '<tr><td>'+esc(bareGate(x.name))+'</td><td style="text-align:left">'+esc(x.floor)+'</td>'
               + '<td class="num">'+fmt(x.early)+'</td><td class="num">'+fmt(x.late)+'</td>'
-              + '<td>'+chipPct(x.chg)+'</td>'
+              + '<td>'+(x.isNew ? '<span class="chip chip-up">เปิดใหม่</span>'
+                        : x.isGone ? '<span class="chip chip-dn">หยุดใช้งาน</span>'
+                        : chipPct(x.chg))+'</td>'
               + '<td class="num">'+fmt(x.periodAvg)+'</td>'
               + '<td class="num">'+(x.prevAvg===null?'—':fmt(x.prevAvg))+'</td>'
               + '<td>'+chipPct(pctChange(x.periodAvg, x.prevAvg))+'</td></tr>';
@@ -5247,7 +5487,11 @@ function growthTable(rows, kind){
         return '<tr><td><span class="rank'+(i<3?' top':'')+'">'+(i+1)+'</span>'+esc(bareGate(x.name))
              + ' <span style="color:var(--faint);font-size:11.5px">'+esc(x.floor)+'</span></td>'
           + '<td class="num">'+fmt(x.early)+'</td><td class="num">'+fmt(x.late)+'</td>'
-          + '<td>'+chipPct(x.chg)+'</td></tr>';
+          /* ประตูเปิดใหม่/หยุดใช้งานไม่มี % ที่คำนวณได้ (หารด้วยศูนย์)
+             ต้องบอกเป็นคำ ไม่ใช่ปล่อยเป็น "—" ซึ่งอ่านว่าไม่มีข้อมูล */
+          + '<td>'+(x.isNew ? '<span class="chip chip-up">เปิดใหม่</span>'
+                    : x.isGone ? '<span class="chip chip-dn">หยุดใช้งาน</span>'
+                    : chipPct(x.chg))+'</td></tr>';
       }).join('')
     + '</tbody></table></div>';
 }
@@ -5344,14 +5588,19 @@ function renderMonthly(){
         + TH_MON_ABBR.map(function(m){ return '<th class="no-sort">'+m+'</th>'; }).join('')
         + '<th class="no-sort">เฉลี่ยทั้งปี</th></tr></thead><tbody>'
         + matrix.map(function(r){
-            var vals = r.cells.filter(Boolean).map(function(c){ return c.avg; });
+            /* ต้องถ่วงน้ำหนักด้วยจำนวนวัน (Σรวม ÷ Σวัน) ไม่ใช่ค่าเฉลี่ยของค่าเฉลี่ยรายเดือน
+               ไม่งั้นเดือนที่มีข้อมูลแค่ 3 วันจะมีน้ำหนักเท่าเดือนที่มีครบ 31 วัน
+               และตัวเลข "เฉลี่ยทั้งปี" ช่องนี้จะไม่ตรงกับตารางสรุปรายปีด้านล่างในหน้าเดียวกัน */
+            var cs = r.cells.filter(Boolean);
+            var yAvg = safeDiv(sum(cs.map(function(c){ return c.total; })),
+                               sum(cs.map(function(c){ return c.n; })));
             return '<tr><td><b>'+r.be+'</b></td>'
               + r.cells.map(function(c){
                   if(!c) return '<td style="color:var(--faint)">—</td>';
                   return '<td class="num" title="รวม '+fmt(c.total)+' '+META.unit+' จาก '+c.n+' วัน" '
                        + 'style="background:'+heatColor(c.avg, mxAvg)+';color:'+heatTextColor(c.avg, mxAvg)+'">'
                        + fmt(c.avg)+'</td>'; }).join('')
-              + '<td class="num"><b>'+fmt(avg(vals))+'</b></td></tr>';
+              + '<td class="num"><b>'+fmt(yAvg)+'</b></td></tr>';
           }).join('')
         + '</tbody></table></div>',
         '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblMatrix\',\'ตารางไขว้ปีเดือน\')">ส่งออก Excel</button>')
@@ -5448,7 +5697,10 @@ function renderVehicles(){
     { k:'moto',    label:'รถจักรยานยนต์',       unit:'ครั้ง', grad:'g-violet', icon:ICON.moto },
     { k:'taxi',    label:'แท็กซี่',              unit:'ครั้ง', grad:'g-rose',   icon:ICON.car },
     { k:'deli',    label:'เดลิเวอรี่',            unit:'ครั้ง', grad:'g-lime',   icon:ICON.moto },
-    { k:'net',     label:'รถค้างในลานสิ้นวัน',    unit:'คัน',  grad:'g-slate',  icon:ICON.ratio }
+    /* ค่านี้คือ Σ(เข้า−ออก) ตลอดทั้งช่วง ไม่ใช่จำนวนรถ ณ สิ้นวันใดวันหนึ่ง
+       ช่วง 30 วันที่สุทธิวันละ +50 จะได้ 1,500 ซึ่งอ่านผิดทันทีถ้าพาดหัวว่า "สิ้นวัน"
+       จึงตั้งชื่อตามสิ่งที่คำนวณจริง แล้วให้ค่าเฉลี่ยต่อวันเป็นตัวชี้วัดที่ใช้งานได้ */
+    { k:'net',     label:'ยอดสุทธิสะสม (เข้า−ออก)', unit:'คัน',  grad:'g-slate',  icon:ICON.ratio }
   ];
   var netVal = cur.carIn - cur.carOut, netPrev = prev.carIn - prev.carOut;
 
@@ -5457,7 +5709,9 @@ function renderVehicles(){
     var pv= m.k==='net' ? netPrev : prev[m.k];
     return kpiCard({ grad:m.grad, icon:m.icon, label:m.label, value:fmt(v), unit:m.unit,
       delta: prev.n ? deltaText(pctChange(safeDiv(v,cur.n), safeDiv(pv,prev.n)), 'เฉลี่ย/วัน เทียบช่วงก่อน') : null,
-      sub: 'เฉลี่ย '+fmt(safeDiv(v,cur.n))+' '+m.unit+'/วัน' });
+      sub: m.k==='net'
+             ? 'สะสมทั้งช่วง · เฉลี่ยวันละ '+fmt(safeDiv(v,cur.n))+' '+m.unit
+             : 'เฉลี่ย '+fmt(safeDiv(v,cur.n))+' '+m.unit+'/วัน' });
   }).join('');
 
   // สัดส่วนยานพาหนะแต่ละประเภท
@@ -5508,8 +5762,13 @@ function renderVehicles(){
             + '</div>'
           : '')
         + '<div class="grid grid-cols-2 gap-3 mb-3">'
-        + miniStat('ก่อน 10:00 น.', fmt(beforeOpen), 'คัน', safeDiv(beforeOpen, cur.carIn), METRIC_COLOR.carOut12)
-        + miniStat('ตั้งแต่ 10:00 น.', fmt(cur.carIn12), 'คัน', safeDiv(cur.carIn12, cur.carIn), METRIC_COLOR.carIn)
+        /* ตอนข้อมูลไม่สอดคล้อง (carIn12 > carIn) การปัด beforeOpen เป็น 0 ทำให้
+           สองสัดส่วนรวมกันได้เกิน 100% (0% + 120%) ซึ่งขัดกันเองในกล่องเดียว
+           กรณีนั้นต้องไม่แสดงสัดส่วนเลย ปล่อยให้กล่องเตือนด้านบนอธิบายแทน */
+        + miniStat('ก่อน 10:00 น.', fmt(beforeOpen), 'คัน',
+                   beforeOpenBad ? null : safeDiv(beforeOpen, cur.carIn), METRIC_COLOR.carOut12)
+        + miniStat('ตั้งแต่ 10:00 น.', fmt(cur.carIn12), 'คัน',
+                   beforeOpenBad ? null : safeDiv(cur.carIn12, cur.carIn), METRIC_COLOR.carIn)
         + '</div>'
         + chartBox('chVehSplit', 230))
     + card('รถยนต์รายชั่วโมง ตลอด 24 ชั่วโมง', 'ค่าเฉลี่ยต่อวัน · ใช้จัดกะเจ้าหน้าที่ลานจอด',
@@ -5961,7 +6220,7 @@ function renderQuality(){
             q.gateCountShift.length ? listChips(q.gateCountShift, function(x){ return thDate(x.date,'short')+' ('+x.from+'→'+x.to+')'; }) : '')
 
         + section('ยอดเข้า–ออกไม่สมดุล', q.outOfOrder.length,
-            'ยอดลูกค้าออกต่างจากยอดเข้าเกิน 25% ซึ่งผิดปกติสำหรับศูนย์การค้าที่คนเข้าและออกใกล้เคียงกัน',
+            'ยอดลูกค้าออกต่างจากยอดเข้าเกิน 25% (สูงกว่าหรือต่ำกว่าก็ตาม) ซึ่งผิดปกติสำหรับศูนย์การค้าที่คนเข้าและออกใกล้เคียงกัน',
             'ตรวจว่าตาราง "ลูกค้าออก" ของวันนั้นคีย์ครบทุกประตูหรือไม่',
             q.outOfOrder.length ? listChips(q.outOfOrder, function(x){ return thDate(x.date,'short')+' ('+fmt1(x.ratio*100)+'%)'; }) : '')
 
@@ -6643,8 +6902,10 @@ function buildReportPages(days){
   dtGroups.forEach(function(g){
     var n = g.days.length;
     g.n = n;
-    g.avgIn  = n ? Math.round(sum(g.days.map(function(d){ return d.s.custIn; }))/n) : 0;
-    g.avgCar = n ? Math.round(sum(g.days.map(function(d){ return d.s.carIn;  }))/n) : 0;
+    /* ต้องใช้ dayCustIn เพื่อให้เคารพตัวกรองชั้นเหมือนตัวเลขอื่นในรายงานหน้าเดียวกัน
+       (ข้อมูลรถไม่มีชั้น จึงคงเป็นยอดทั้งศูนย์เสมอตามปกติ) */
+    g.avgIn  = n ? Math.round(sum(g.days.map(function(d){ return dayCustIn(d, STATE.filter.floor); }))/n) : 0;
+    g.avgCar = n ? Math.round(sum(g.days.map(function(d){ return d.s.carIn; }))/n) : 0;
   });
   var wdBase = dtGroups[0].avgIn;   // ใช้วันธรรมดาเป็นฐาน 100 เพื่อเทียบเป็นดัชนี
   var dtMax  = Math.max.apply(null, dtGroups.map(function(g){ return g.avgIn; }).concat([1]));
@@ -6716,9 +6977,9 @@ function buildReportPages(days){
   var p1 = a4Page('รายงานสรุปยอดลูกค้าและยานพาหนะ', period,
       execSummary()
     + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px">'
-    +   a4Kpi('ลูกค้าเข้าทั้งหมด', fmt(cur.custIn), 'คน', pctChange(safeDiv(cur.custIn,cur.n), safeDiv(prev.custIn,prev.n)), '#008960','#00694A')
+    +   a4Kpi('ลูกค้าเข้าทั้งหมด', fmt(cur.custIn), 'คน', pctChange(safeDiv(cur.custIn,cur.n), safeDiv(prev.custIn,prev.n)), '#008960','#00694A', 'เทียบเฉลี่ย/วัน ช่วงก่อน')
     +   a4Kpi('ลูกค้าเฉลี่ยต่อวัน', fmt(cur.avgIn), 'คน', null, '#0E8C93','#0A6A70')
-    +   a4Kpi('รถยนต์เข้าทั้งหมด', fmt(cur.carIn), 'คัน', pctChange(safeDiv(cur.carIn,cur.n), safeDiv(prev.carIn,prev.n)), '#A97A00','#8A6100')
+    +   a4Kpi('รถยนต์เข้าทั้งหมด', fmt(cur.carIn), 'คัน', pctChange(safeDiv(cur.carIn,cur.n), safeDiv(prev.carIn,prev.n)), '#A97A00','#8A6100', 'เทียบเฉลี่ย/วัน ช่วงก่อน')
     +   a4Kpi('ลูกค้าต่อรถ 1 คัน', cur.perCar!==null?fmt1(cur.perCar):'—', 'คน/คัน', null, '#B4650B','#B4650B')
     + '</div>'
     + '<div style="display:grid;grid-template-columns:1.55fr 1fr;gap:12px">'
@@ -6747,7 +7008,7 @@ function buildReportPages(days){
     var row = [], dl = days.filter(function(d){ return d.dow === hd; });
     for(var hh=0; hh<PED_HOURS.length; hh++){
       var v = dl.length
-        ? Math.round(sum(dl.map(function(d){ return (d.ph && d.ph[hh]) || 0; })) / dl.length)
+        ? Math.round(sum(dl.map(function(d){ return dayPh(d, STATE.filter.floor)[hh] || 0; })) / dl.length)
         : 0;
       if(v > hmMax) hmMax = v;
       row.push(v);
@@ -6821,7 +7082,7 @@ function buildReportPages(days){
                 + '<td style="padding:3.5px 6px">'+esc(bareGate(g.name))+'</td>'
                 + '<td style="padding:3.5px 6px;color:#54685C">'+esc(g.floor)+'</td>'
                 + '<td style="padding:3.5px 6px;text-align:right;font-weight:700">'+fmt(g.total)+'</td>'
-                + '<td style="padding:3.5px 6px;text-align:right">'+fmt(safeDiv(g.total,g.days))+'</td>'
+                + '<td style="padding:3.5px 6px;text-align:right">'+fmt(gateAvg(g,cur.n))+'</td>'
                 + '<td style="padding:3.5px 6px;text-align:right;color:#54685C">'+(glTotal?fmt1(g.total/glTotal*100)+'%':'—')+'</td></tr>';
             }).join('')
           + '</table>')
@@ -6920,12 +7181,18 @@ function tint(hex, pct){
   var r0 = (n>>16)&255, g0 = (n>>8)&255, b0 = n&255, k = pct/100;
   return 'rgb('+Math.round(r0*k+255*(1-k))+','+Math.round(g0*k+255*(1-k))+','+Math.round(b0*k+255*(1-k))+')';
 }
-function a4Kpi(label, value, unit, delta, c1, c2){
+/* dLabel: ต้องระบุเสมอว่า % ที่แสดงเทียบ "อะไร"
+   การ์ดที่พาดหัวว่า "ทั้งหมด" แต่โชว์ % ของค่าเฉลี่ยต่อวัน ทำให้อ่านได้ว่า
+   ยอดรวมเพิ่มขึ้น 5% ทั้งที่ยอดรวมจริงลดลง (เพราะช่วงนี้มีจำนวนวันน้อยกว่า) */
+function a4Kpi(label, value, unit, delta, c1, c2, dLabel){
   var d = '';
   if(delta!==null && Number.isFinite(delta)){
-    var col = delta>0.05 ? '#008960' : (delta<-0.05 ? '#C42A46' : '#8A9A90');
+    var up = delta>0.05, dn = delta<-0.05;
+    var col = up ? '#008960' : (dn ? '#C42A46' : '#8A9A90');
+    /* ที่ 0% ต้องเป็น "—" ไม่ใช่ ▼ ซึ่งอ่านว่าลดลงทั้งที่เท่าเดิมเป๊ะ */
+    var ar  = up ? '▲' : (dn ? '▼' : '—');
     d = '<div style="font-size:9.5px;margin-top:2px;color:#54685C">'
-      + '<b style="color:'+col+'">'+(delta>0?'▲':'▼')+' '+fmtPct(delta)+'</b> เทียบช่วงก่อน</div>';
+      + '<b style="color:'+col+'">'+ar+' '+fmtPct(delta)+'</b> '+esc(dLabel||'เทียบช่วงก่อน')+'</div>';
   }
   return '<div style="background:linear-gradient(140deg,'+tint(c1,22)+','+tint(c2,11)+');'
     + 'border:1px solid '+tint(c1,38)+';border-radius:13px;padding:11px 13px;position:relative;overflow:hidden">'
@@ -7057,9 +7324,11 @@ function buildInfographic(days){
     /* พื้นสีอ่อน ตัวหนังสือเข้ม — ชุดเดียวกับการ์ดในแอปและในรายงาน A4 */
     var dd = '';
     if(d!==null && Number.isFinite(d)){
-      var col = d>0.05 ? '#008960' : (d<-0.05 ? '#C42A46' : '#8A9A90');
+      var up = d>0.05, dn = d<-0.05;
+      var col = up ? '#008960' : (dn ? '#C42A46' : '#8A9A90');
+      /* ที่ 0% ต้องเป็น "—" ไม่ใช่ ▼ ซึ่งอ่านว่าลดลงทั้งที่เท่าเดิม */
       dd = '<div style="font-size:10px;margin-top:2px;color:#54685C">'
-         + '<b style="color:'+col+'">'+(d>0?'▲':'▼')+' '+fmtPct(d)+'</b> เทียบช่วงก่อน</div>';
+         + '<b style="color:'+col+'">'+(up?'▲':(dn?'▼':'—'))+' '+fmtPct(d)+'</b> เทียบเฉลี่ย/วัน ช่วงก่อน</div>';
     }
     return '<div style="background:linear-gradient(140deg,'+tint(c1,22)+','+tint(c2,11)+');'
       + 'border:1px solid '+tint(c1,38)+';border-radius:14px;padding:13px 15px;position:relative;overflow:hidden">'
@@ -7349,7 +7618,14 @@ function exportTableXlsx(tableId, name){
        และตัวเลขที่ผ่าน fmt() มีเครื่องหมายคั่นหลัก Excel จะรับเป็นข้อความ
        จึงต้องถอดเครื่องหมายคั่นออกให้กลับเป็นตัวเลขจริง */
     var clone = t.cloneNode(true);
-    clone.querySelectorAll('.rank, .hint, .chip, .no-export').forEach(function(el){ el.remove(); });
+    clone.querySelectorAll('.rank, .hint, .no-export').forEach(function(el){ el.remove(); });
+    /* ห้ามลบ .chip ทิ้ง — chipPct() ห่อ "ตัวเลข % เปลี่ยนแปลง" ไว้ในนั้น
+       การลบทั้งก้อนทำให้คอลัมน์ "เปลี่ยนแปลง" ในไฟล์ที่ส่งออกว่างเปล่าทุกแถว
+       จึงคลี่ออกเป็นข้อความแทน พร้อมถอดลูกศร ▲▼ ที่ Excel เอาไปคำนวณต่อไม่ได้ */
+    clone.querySelectorAll('.chip').forEach(function(el){
+      var txt = el.textContent.replace(/[▲▼]/g,'').replace(/\s+/g,' ').trim();
+      el.replaceWith(clone.ownerDocument.createTextNode(txt));
+    });
     clone.querySelectorAll('td, th').forEach(function(td){
       var txt = td.textContent.replace(/\s+/g,' ').trim();
       /* ตัวเลขล้วน (อาจมีคั่นหลัก ทศนิยม เครื่องหมายลบ หรือ %) → คืนเป็นตัวเลขดิบ */
@@ -7381,12 +7657,22 @@ function exportAllXlsx(){
     var cur = aggregate(days, STATE.filter.floor);
 
     // ชีต 1: รายวัน
-    var s1 = [['วันที่ (พ.ศ.)','วันที่ (ค.ศ.)','วันในสัปดาห์','วันหยุด','ลูกค้าเข้า','ลูกค้าออก',
-               'รถยนต์เข้า','รถยนต์ออก','จยย.','แท็กซี่','เดลิเวอรี่','จำนวนประตู','แท็บต้นทาง','ไฟล์ต้นทาง']];
+    /* ชีตนี้เคยอ่าน d.s.* ดิบ ๆ ขณะที่ชีต 2-5 ใช้ cur ที่กรองชั้นแล้ว
+       ผลคือไฟล์เดียวมียอดรวมสองค่าที่ขัดกันเอง — ต้องกรองชั้นให้ตรงกัน
+       (คอลัมน์ยานพาหนะไม่มีข้อมูลชั้น จึงเป็นยอดทั้งศูนย์เสมอ ระบุไว้ในหัวคอลัมน์) */
+    var xFloor  = STATE.filter.floor;
+    var onFloor = xFloor && xFloor !== 'all';
+    var vehNote = onFloor ? ' (ทั้งศูนย์)' : '';
+    var flNote  = onFloor ? ' ('+xFloor+')' : '';
+    var s1 = [['วันที่ (พ.ศ.)','วันที่ (ค.ศ.)','วันในสัปดาห์','วันหยุด',
+               'ลูกค้าเข้า'+flNote, 'ลูกค้าออก'+flNote,
+               'รถยนต์เข้า'+vehNote,'รถยนต์ออก'+vehNote,'จยย.'+vehNote,'แท็กซี่'+vehNote,'เดลิเวอรี่'+vehNote,
+               'จำนวนประตู','แท็บต้นทาง','ไฟล์ต้นทาง']];
     days.forEach(function(d){
       s1.push([thDate(d.d,'medium'), d.d, TH_DOW_FULL[d.dow], holidayName(d.d)||'',
-               d.s.custIn, d.s.custOut, d.s.carIn, d.s.carOut, d.s.moto, d.s.taxi, d.s.deli,
-               d.pi.length, d.sh, d.f]);
+               dayCustIn(d, xFloor), dayCustOut(d, xFloor),
+               d.s.carIn, d.s.carOut, d.s.moto, d.s.taxi, d.s.deli,
+               (d.pi||[]).length, d.sh, d.f]);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s1), 'รายวัน');
 
@@ -7394,7 +7680,7 @@ function exportAllXlsx(){
     var s2 = [['ประตู','ชั้น','ยอดเข้ารวม','ยอดออกรวม','เฉลี่ยเข้า/วัน','จำนวนวันที่มีข้อมูล','สูงสุดวันเดียว','วันที่สูงสุด']];
     gateList(cur.gateIn).forEach(function(g){
       var o = cur.gateOut[g.key];
-      s2.push([g.name, g.floor, g.total, o?o.total:'', Math.round(safeDiv(g.total,g.days)||0), g.days, g.max, g.maxDate?thDate(g.maxDate,'medium'):'']);
+      s2.push([g.name, g.floor, g.total, o?o.total:'', Math.round(gateAvg(g,cur.n)||0), g.days, g.max, g.maxDate?thDate(g.maxDate,'medium'):'']);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s2), 'รายประตู');
 
