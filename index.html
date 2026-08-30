@@ -200,11 +200,17 @@ h1,h2,h3,h4{ line-height:1.45; font-family:'IBM Plex Sans Thai Looped','Sarabun'
 
 .nav-sec{ padding:15px 18px 6px; font-size:10.5px; font-weight:800; letter-spacing:.16em;
           text-transform:uppercase; color:var(--side-label) }
+/* .nav-item เป็น <button> ตั้งแต่รุ่น 3.5 (เดิมเป็น <div> ซึ่งกดด้วยคีย์บอร์ดไม่ได้เลย
+   ทำให้ 5 หน้า — รายวัน รายงาน Infographic คุณภาพข้อมูล ตั้งค่า — เข้าถึงไม่ได้ทางใดเลย
+   เพราะแป้นลัดตัวเลขครอบแค่ 9 หน้าแรก) จึงต้องล้างสไตล์เริ่มต้นของปุ่มให้หน้าตาเหมือนเดิม */
 .nav-item{
   display:flex; align-items:center; gap:11px; margin:1px 10px; padding:9px 12px;
   border-radius:11px; font-size:13.5px; font-weight:500; cursor:pointer; color:var(--side-text);
-  transition:background .15s, color .15s; user-select:none; line-height:1.5;
+  transition:background .15s, color .15s; user-select:none; -webkit-user-select:none; line-height:1.5;
+  width:calc(100% - 20px); text-align:right; background:none; border:0;
+  font-family:inherit; appearance:none; -webkit-appearance:none;
 }
+.nav-item > svg{ order:-1 }
 .nav-item:hover{ background:rgba(255,255,255,.06); color:#fff }
 .nav-item.active{ color:#fff; font-weight:700;
   background:linear-gradient(90deg, rgba(0,137,96,.32), rgba(235,180,0,.12));
@@ -481,7 +487,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:13p
 table.tbl th{
   position:sticky; top:0; z-index:2; background:var(--surface-2); text-align:right;
   padding:9px 12px; font-size:11.5px; font-weight:800; color:var(--muted);
-  border-bottom:1px solid var(--line); white-space:nowrap; cursor:pointer; user-select:none;
+  border-bottom:1px solid var(--line); white-space:nowrap; cursor:pointer; user-select:none; -webkit-user-select:none;
 }
 table.tbl th:first-child, table.tbl td:first-child{ text-align:left }
 table.tbl th.no-sort{ cursor:default }
@@ -495,14 +501,21 @@ table.tbl tbody tr:hover td{ background:var(--surface-2) }
 
    ใช้ตัวแปร --rowbg เพราะคอลัมน์แรกถูกตรึงไว้บนมือถือและต้องทึบ
    ถ้าให้คอลัมน์ตรึงใช้ var(--surface) เฉย ๆ สีของแถวจะขาดหายไปหนึ่งช่อง */
-table.tbl tbody tr.r-sat   { --rowbg:color-mix(in srgb, var(--p-mint) 34%, var(--surface)) }
-table.tbl tbody tr.r-sun   { --rowbg:color-mix(in srgb, var(--p-sun)  32%, var(--surface)) }
-table.tbl tbody tr.r-hol   { --rowbg:color-mix(in srgb, var(--p-coral) 30%, var(--surface)) }
-table.tbl tbody tr.r-blank { --rowbg:color-mix(in srgb, var(--faint)   13%, var(--surface)) }
-html.dark table.tbl tbody tr.r-sat   { --rowbg:color-mix(in srgb, var(--p-mint) 15%, var(--surface)) }
-html.dark table.tbl tbody tr.r-sun   { --rowbg:color-mix(in srgb, var(--p-sun)  15%, var(--surface)) }
-html.dark table.tbl tbody tr.r-hol   { --rowbg:color-mix(in srgb, var(--p-coral) 17%, var(--surface)) }
-html.dark table.tbl tbody tr.r-blank { --rowbg:color-mix(in srgb, var(--faint)   16%, var(--surface)) }
+/* สีทึบบรรทัดแรกคือ fallback ที่ขาดไม่ได้ — color-mix() ต้องการ Safari 16.2+ / Chrome 111+
+   iPad ที่ค้างอยู่ iPadOS 15–16.1 จะทิ้งทั้งบรรทัดที่มี color-mix แล้วแถวทุกประเภท
+   จะกลายเป็นสีเดียวกันหมด
+   นี่ไม่ใช่แค่เรื่องความสวย: คำอธิบายใต้ตารางระบุว่า "แถวสีเทา = ยังไม่คีย์ข้อมูล
+   เลข 0 ในแถวนี้ไม่ใช่ยอดจริง" โดยอ้างอิงสีแถวเป็นตัวชี้ พอสีหาย เจ้าหน้าที่จะอ่าน
+   เลข 0 ของวันที่ยังไม่ได้คีย์เป็นยอดจริง และแยกวันหยุด/เสาร์–อาทิตย์ไม่ออก
+   ค่าที่ใส่คือผลลัพธ์ของ color-mix เดียวกันที่คำนวณไว้ล่วงหน้าบนพื้นสีของแต่ละธีม */
+table.tbl tbody tr.r-sat   { --rowbg:#A8D7C9; --rowbg:color-mix(in srgb, var(--p-mint) 34%, var(--surface)) }
+table.tbl tbody tr.r-sun   { --rowbg:#F9E7AD; --rowbg:color-mix(in srgb, var(--p-sun)  32%, var(--surface)) }
+table.tbl tbody tr.r-hol   { --rowbg:#F8C7CF; --rowbg:color-mix(in srgb, var(--p-coral) 30%, var(--surface)) }
+table.tbl tbody tr.r-blank { --rowbg:#F0F2F1; --rowbg:color-mix(in srgb, var(--faint)   13%, var(--surface)) }
+html.dark table.tbl tbody tr.r-sat   { --rowbg:#0D3B2F; --rowbg:color-mix(in srgb, var(--p-mint) 15%, var(--surface)) }
+html.dark table.tbl tbody tr.r-sun   { --rowbg:#2C3A22; --rowbg:color-mix(in srgb, var(--p-sun)  15%, var(--surface)) }
+html.dark table.tbl tbody tr.r-hol   { --rowbg:#332F2F; --rowbg:color-mix(in srgb, var(--p-coral) 17%, var(--surface)) }
+html.dark table.tbl tbody tr.r-blank { --rowbg:#1E3B31; --rowbg:color-mix(in srgb, var(--faint)   16%, var(--surface)) }
 
 table.tbl tbody tr[class*="r-"] td{ background:var(--rowbg) }
 /* เส้นสีบาง ๆ ริมซ้ายของแถว ช่วยให้แยกประเภทวันได้แม้พิมพ์ขาวดำ */
@@ -556,7 +569,7 @@ table.tbl tfoot td{ font-weight:800; background:var(--surface-2); border-top:2px
 .toast.warn .ti{ background:var(--warn) }
 .toast.info .ti{ background:var(--accent) }
 
-.modal-mask{ position:fixed; inset:0; background:rgba(2,6,23,.6); backdrop-filter:blur(3px);
+.modal-mask{ position:fixed; inset:0; background:rgba(2,6,23,.6); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px);
              z-index:100; display:none; align-items:center; justify-content:center; padding:18px }
 .modal-mask.on{ display:flex }
 .modal{ background:var(--surface); border:1px solid var(--line); border-radius:18px;
@@ -674,12 +687,49 @@ html.dark #splash .sp-bg{ opacity:.34 }
 .a4-preview{ overflow:auto; background:#64748b; padding:16px; border-radius:14px }
 .a4-preview .a4{ transform-origin:top left; box-shadow:0 18px 50px -18px rgba(0,0,0,.6) }
 
+/* ---------------- การพิมพ์ (v3.5 · เขียนใหม่ทั้งบล็อก) ----------------
+   ของเดิมมี 5 บรรทัด และพิมพ์รายงาน A4 ออกมาใช้ไม่ได้เลย 5 อาการพร้อมกัน:
+     1) ขอบขวาทุกหน้าถูกตัด — .a4 กว้าง 1123px แต่ A4 แนวนอนหักขอบ 10 มม.
+        เหลือพื้นที่พิมพ์เพียง ~1047px · การย่อพรีวิวใช้ CSS transform:scale()
+        ซึ่งไม่ลดขนาดกล่อง layout จึงไม่ช่วยตอนพิมพ์
+     2) แถบตัวกรองและแถบบริบทถูกพิมพ์ติดไปด้วย (ไม่มีคลาส no-print)
+     3) ปุ่มส่งออก PDF/JPEG/PPTX ติดไปบนกระดาษที่ส่งผู้บริหาร
+     4) ไม่มี break-after ต่อหน้า — รายงาน 4 หน้ากลายเป็นกระดาษ 6 แผ่นที่หั่นกลางหน้า
+     5) พื้นเทาของพรีวิวและ overflow:auto ยังมีผล ตัวหลังตัดเนื้อหาที่ล้นทิ้ง
+   จึงกำหนดขนาดเป็นมิลลิเมตรตรง ๆ แทน px และให้ @page เลือกแนวตามหน้าที่กำลังเปิด */
 @media print{
-  .sidebar,.topbar,.no-print,#toasts,.side-mask{ display:none !important }
+  .sidebar, .topbar, .no-print, #toasts, .side-mask,
+  #filterBar, #ctxBar, #progWrap, #splash, #noData, .side-foot{ display:none !important }
   body{ background:#fff }
   .card{ box-shadow:none; break-inside:avoid }
-  @page{ size:A4 landscape; margin:10mm }
+  .main{ margin:0 !important; padding:0 !important }
+
+  /* พรีวิวรายงาน: ถอดกรอบ ถอดการย่อ แล้วกำหนดขนาดจริงเป็น มม. ให้พอดีพื้นที่พิมพ์ */
+  .a4-preview{ overflow:visible !important; background:#fff !important; padding:0 !important; border-radius:0 !important }
+  .a4-preview > div{ margin:0 !important }
+  .a4-preview .a4{
+    transform:none !important; box-shadow:none !important;
+    width:277mm !important; height:190mm !important;
+    break-after:page; page-break-after:always;
+  }
+  .a4-preview .a4:last-child{ break-after:auto; page-break-after:auto }
+
+  /* Infographic เป็น A4 แนวตั้ง (794x1123) — ต้องไม่ถูกบังคับเป็นแนวนอน
+     ไม่งั้น Ctrl+P จะหั่นโปสเตอร์เป็น 3 ท่อนพร้อมแถบเทาข้างขวา
+     (หน้านี้ไม่มีปุ่มพิมพ์ก็จริง แต่ Ctrl+P และ "แชร์ > พิมพ์" บน iPad
+      เป็นสิ่งที่ผู้ใช้ทำเป็นปกติกับหน้าที่ตั้งใจให้เอาไปติดบอร์ด) */
+  #igPreview .a4p{
+    transform:none !important; box-shadow:none !important;
+    width:190mm !important; height:277mm !important;
+  }
+  #igPreview{ height:auto !important }
+
+  @page{ margin:10mm }
 }
+/* แนวกระดาษเป็นแนวนอนโดยปริยาย (รายงาน A4 และหน้าจอทั่วไป)
+   หน้า Infographic สลับเป็นแนวตั้งด้วย setPageOrientation() ตอน goView
+   ทำผ่าน <style> ที่ฉีดเข้าไป เพราะ @page ไม่รับ selector จึงกำหนดตามคลาสไม่ได้ */
+@page{ size:A4 landscape }
 
 /* ---------------- โลโก้ Seacon และหัวแถบข้าง ---------------- */
 .logo-img{ height:34px; width:auto; display:block; object-fit:contain }
@@ -749,7 +799,7 @@ html.dark #splash .sp-bg{ opacity:.34 }
 .gsel-list{ max-height:min(320px,50vh); overflow:auto; padding:6px }
 .gsel-grp{ font-size:10.5px; font-weight:800; letter-spacing:.06em; color:var(--muted); padding:9px 10px 4px }
 .gsel-opt{ display:flex; align-items:center; gap:9px; padding:7px 10px; border-radius:9px;
-           cursor:pointer; font-size:13px; user-select:none }
+           cursor:pointer; font-size:13px; user-select:none; -webkit-user-select:none }
 .gsel-opt:hover{ background:var(--surface-2) }
 .gsel-opt.on{ background:color-mix(in srgb, var(--accent) 22%, var(--surface)) }
 .gsel-box{ width:17px; height:17px; border-radius:5px; border:1.6px solid var(--faint);
@@ -793,12 +843,14 @@ ul,ol{ margin:0; padding:0 }
 .truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .overflow-hidden{overflow:hidden}.overflow-x-auto{overflow-x:auto}.overflow-y-auto{overflow-y:auto}
 .relative{position:relative}.sticky{position:sticky}.top-0{top:0}.z-30{z-index:30}
-.cursor-pointer{cursor:pointer}.select-none{user-select:none}
+.cursor-pointer{cursor:pointer}.select-none{-webkit-user-select:none;user-select:none}
 .font-bold{font-weight:700}.font-semibold{font-weight:600}.font-extrabold{font-weight:800}
 .font-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .leading-tight{line-height:1.4}.leading-relaxed{line-height:1.7}
 .tracking-\[\.18em\]{letter-spacing:.18em}
-.backdrop-blur{backdrop-filter:blur(8px)}
+/* Safari ต้องการ -webkit- จนถึงรุ่น 17 — บน iPad รุ่นก่อนหน้านั้นแถบบนจะไม่เบลอ
+   ซึ่งซ้อนกับกรณี color-mix ไม่รองรับ ทำให้แถบบนโปร่งใสสนิทและอ่านไม่ออกขณะเลื่อน */
+.backdrop-blur{-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .transition-all{transition:all .2s}.duration-300{transition-duration:.3s}
 .rounded{border-radius:.25rem}.rounded-sm{border-radius:.2rem}.rounded-lg{border-radius:.55rem}
 .rounded-xl{border-radius:.75rem}.rounded-2xl{border-radius:1rem}.rounded-full{border-radius:9999px}
@@ -998,6 +1050,27 @@ html{ -webkit-text-size-adjust:100%; text-size-adjust:100% }
   .content-wrap{ max-width:1720px; margin-inline:auto; width:100% }
 }
 
+/* ---- 10ข. ตัวชี้โฟกัสกลาง (v3.5) ----
+   เดิม .inp{outline:none} ทิ้ง ring ของเบราว์เซอร์แล้วแทนด้วยเงาความทึบ 20%
+   ซึ่งคอนทราสต์ต่ำกว่าเกณฑ์ WCAG 2.4.11 มาก และปุ่มบนพื้นเขียว/ทองเข้ม
+   ได้ ring ดำของ UA ที่แทบกลืนไปกับพื้น
+   :focus-visible แสดงเฉพาะตอนใช้คีย์บอร์ด จึงไม่รบกวนคนที่ใช้เมาส์ */
+:where(button,a,input,select,textarea,summary,[tabindex]):focus-visible{
+  outline:2px solid var(--brand); outline-offset:2px; border-radius:6px;
+}
+.sidebar :where(button,a,[tabindex]):focus-visible{ outline-color:var(--c-gold) }
+.inp:focus-visible{ outline:2px solid var(--brand); outline-offset:1px }
+
+/* ---- 10ค. สถานะการเรียงลำดับของตาราง (v3.5) ----
+   เดิมไม่มีตัวบอกเลยว่าตารางกำลังเรียงตามคอลัมน์ไหน ทิศทางใด
+   เป็นปัญหาของผู้ใช้ทุกคน ไม่ใช่แค่ผู้ใช้ screen reader */
+table.tbl th[data-k]{ cursor:pointer; user-select:none; -webkit-user-select:none }
+table.tbl th[data-k]::after{
+  content:'\2195'; margin-inline-start:5px; font-size:10px; opacity:.3; font-weight:400;
+}
+table.tbl th[aria-sort="ascending"]::after { content:'\25B2'; opacity:1; color:var(--brand) }
+table.tbl th[aria-sort="descending"]::after{ content:'\25BC'; opacity:1; color:var(--brand) }
+
 /* ---- 11. ลดการเคลื่อนไหวตามที่ผู้ใช้ตั้งค่าไว้ในเครื่อง ---- */
 @media (prefers-reduced-motion:reduce){
   *, *::before, *::after{ animation-duration:.001ms !important; animation-iteration-count:1 !important;
@@ -1052,68 +1125,68 @@ html{ -webkit-text-size-adjust:100%; text-size-adjust:100% }
 
   <nav class="flex-1 overflow-y-auto pb-3" id="sideNav">
     <div class="nav-sec">ภาพรวม</div>
-    <div class="nav-item active" data-view="overview">
+    <button type="button" class="nav-item active" data-view="overview">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
       แดชบอร์ดภาพรวม
-    </div>
+    </button>
 
     <div class="nav-sec">การวิเคราะห์</div>
-    <div class="nav-item" data-view="gates">
+    <button type="button" class="nav-item" data-view="gates">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-6h6v6"/></svg>
       รายประตู<span class="nav-badge" id="nb-gates"></span>
-    </div>
-    <div class="nav-item" data-view="intensity">
+    </button>
+    <button type="button" class="nav-item" data-view="intensity">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3 0 3-8 6-8s3 10 6 10 3-6 6-6"/><path d="M3 21h18"/></svg>
       ความหนาแน่นรายชั่วโมง
-    </div>
-    <div class="nav-item" data-view="gtrend">
+    </button>
+    <button type="button" class="nav-item" data-view="gtrend">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg>
       แนวโน้มรายประตู
-    </div>
-    <div class="nav-item" data-view="hourly">
+    </button>
+    <button type="button" class="nav-item" data-view="hourly">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
       ยอดรายชั่วโมง
-    </div>
-    <div class="nav-item" data-view="vehicles">
+    </button>
+    <button type="button" class="nav-item" data-view="vehicles">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14M6 17l-1.5-5L6 7h12l1.5 5L18 17"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/></svg>
       ยานพาหนะทุกประเภท
-    </div>
-    <div class="nav-item" data-view="monthly">
+    </button>
+    <button type="button" class="nav-item" data-view="monthly">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="7"/><rect x="12" y="8" width="3" height="11"/><rect x="17" y="5" width="3" height="14"/></svg>
       รายเดือน / รายปี
-    </div>
-    <div class="nav-item" data-view="compare">
+    </button>
+    <button type="button" class="nav-item" data-view="compare">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M8 21H3v-5M21 3l-7 7M3 21l7-7"/></svg>
       เทียบช่วงเวลา
-    </div>
-    <div class="nav-item" data-view="forecast">
+    </button>
+    <button type="button" class="nav-item" data-view="forecast">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15l5-5 4 4 4-6 5 5"/><path d="M3 21h18"/><circle cx="20" cy="6" r="2"/></svg>
       พยากรณ์ &amp; ผิดปกติ
       <span class="nav-badge text-white g-rose">ใหม่</span>
-    </div>
-    <div class="nav-item" data-view="daily">
+    </button>
+    <button type="button" class="nav-item" data-view="daily">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
       ตารางรายวัน
-    </div>
+    </button>
 
     <div class="nav-sec">รายงาน &amp; ระบบ</div>
-    <div class="nav-item" data-view="report">
+    <button type="button" class="nav-item" data-view="report">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
       รายงาน A4
-    </div>
-    <div class="nav-item" data-view="infographic">
+    </button>
+    <button type="button" class="nav-item" data-view="infographic">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 16v-4M12 16V8M17 16v-6"/></svg>
       Infographic
       <span class="nav-badge text-white g-orange">ใหม่</span>
-    </div>
-    <div class="nav-item" data-view="quality">
+    </button>
+    <button type="button" class="nav-item" data-view="quality">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       คุณภาพข้อมูล<span class="nav-badge" id="nb-quality"></span>
-    </div>
-    <div class="nav-item" data-view="settings">
+    </button>
+    <button type="button" class="nav-item" data-view="settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.09A1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       ตั้งค่า &amp; ไฟล์ข้อมูล
-    </div>
+    </button>
   </nav>
 
   <div class="side-foot">
@@ -1285,7 +1358,7 @@ html{ -webkit-text-size-adjust:100%; text-size-adjust:100% }
    ส่วนที่ 1 · ค่าคงที่ และเครื่องมือพื้นฐาน
 ============================================================================ */
 
-var APP_VERSION = '3.4';
+var APP_VERSION = '3.5';
 
 /* โลโก้ Seacon Bangkae ฝังเป็น data URL — ไฟล์เดียวจบ ไม่ต้องแนบรูปแยก
    มี 2 ชุด: ชุดสีเดิมสำหรับพื้นสว่าง/รายงาน และชุดตัวอักษรสีขาวสำหรับพื้นมืด */
@@ -1798,10 +1871,44 @@ function toast(msg, kind, ms){
   setTimeout(function(){ t.classList.add('out'); setTimeout(function(){ t.remove(); }, 220); },
              ms || (kind==='err' ? 7000 : 3800));
 }
+/* โมดัลต้องเป็น dialog จริง ไม่ใช่แค่ div ที่ลอยอยู่
+   ของเดิม: ไม่มี role/aria-modal · ไม่ย้ายโฟกัสเข้ามา (โฟกัสค้างอยู่บนหน้าหลัง)
+   · Tab ไหลออกไปหน้าหลังทันที · และ Esc ไม่ทำงานเมื่อเคอร์เซอร์อยู่ในช่องกรอก
+   เพราะ handler ระดับ document ตัดจบก่อนด้วย matches('input,select,textarea')
+   ผลคือโมดัลที่มีช่องกรอก (เช่นจับคู่ประตูเปลี่ยนชื่อ) ออกด้วยคีย์บอร์ดไม่ได้เลย */
+var MODAL_RETURN_FOCUS = null;
 function showModal(html){
-  var m=$('modalBox'); m.innerHTML=html; $('modalMask').classList.add('on');
+  var mask = $('modalMask'), m = $('modalBox');
+  m.innerHTML = html;
+  m.setAttribute('role','dialog');
+  m.setAttribute('aria-modal','true');
+  m.setAttribute('tabindex','-1');
+  MODAL_RETURN_FOCUS = document.activeElement;
+  mask.classList.add('on');
+  /* โฟกัสตัวแรกที่โฟกัสได้ในโมดัล ถ้าไม่มีเลยก็โฟกัสตัวกล่องเอง
+     เพื่อให้ Tab ถัดไปเริ่มจากในโมดัล ไม่ใช่จากต้นหน้า */
+  var first = m.querySelector('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])');
+  try{ (first || m).focus(); }catch(e){}
+  m.onkeydown = function(ev){
+    if(ev.key === 'Escape'){ ev.stopPropagation(); closeModal(); return; }
+    if(ev.key !== 'Tab') return;
+    var f = [].slice.call(m.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])'))
+              .filter(function(el){ return !el.disabled && el.offsetParent !== null; });
+    if(!f.length) return;
+    var a = f[0], z = f[f.length-1];
+    if(ev.shiftKey && document.activeElement === a){ ev.preventDefault(); z.focus(); }
+    else if(!ev.shiftKey && document.activeElement === z){ ev.preventDefault(); a.focus(); }
+  };
 }
-function closeModal(){ $('modalMask').classList.remove('on'); }
+function closeModal(){
+  var m = $('modalBox');
+  $('modalMask').classList.remove('on');
+  if(m) m.onkeydown = null;
+  /* คืนโฟกัสให้ปุ่มที่เปิดโมดัล ไม่งั้นโฟกัสกระเด็นไปต้นหน้า
+     แล้วผู้ใช้คีย์บอร์ดต้อง Tab ใหม่ทั้งหมดเพื่อกลับมาที่เดิม */
+  try{ if(MODAL_RETURN_FOCUS && document.body.contains(MODAL_RETURN_FOCUS)) MODAL_RETURN_FOCUS.focus(); }catch(e){}
+  MODAL_RETURN_FOCUS = null;
+}
 
 /* สถานะปุ่ม: กำลังทำงาน → disable + spinner (กันผู้ใช้กดซ้ำระหว่างรอ) */
 function setBusy(btn, busy, label){
@@ -2097,6 +2204,9 @@ var STATE = {
   compare: { mode:'mom' },   // mom | yoy | custom
   forecastDays: 14,
   trendGates: [],            // ประตูที่เลือกดูในหน้าแนวโน้มรายประตู
+  ovGran: null,              /* ความละเอียดกราฟแนวโน้มหน้าภาพรวม
+                               null = ให้ระบบเลือกตามความยาวช่วง (autoGran)
+                               ผู้ใช้กดปุ่มเมื่อไหร่จึงกลายเป็นค่าที่ตั้งเอง */
   trendGran: 'week',         // day | week | month
   trendDir: 'in',            // in = ลูกค้าเข้า, out = ลูกค้าออก
   monthlyMetric: 'custIn',   // ตัวชี้วัดของหน้ารายเดือน/รายปี
@@ -3838,8 +3948,21 @@ function applyDualAxis_(data, opt){
 }
 
 function makeChart(canvasId, type, data, extra){
-  if(typeof Chart==='undefined') return null;      // CDN ยังมาไม่ถึง — ตาราง/ตัวเลขยังแสดงปกติ
-  var cv = $(canvasId); if(!cv) return null;
+  var cv = $(canvasId);
+  if(typeof Chart==='undefined'){
+    /* CDN ยังมาไม่ถึง — ตัวเลขและตารางยังถูกต้องครบถ้วน แต่เดิมเหลือเป็น
+       สี่เหลี่ยมว่างเปล่าสูง 330px ไม่มีข้อความใด ๆ ผู้ใช้จึงคิดว่าโปรแกรมพัง
+       ทั้งที่ความจริงคือเน็ตเข้าไม่ถึง — ต้องบอกให้ชัดว่าอะไรใช้ได้อะไรใช้ไม่ได้ */
+    if(cv && cv.parentElement && !cv.parentElement.dataset.noLib){
+      cv.parentElement.dataset.noLib = '1';
+      cv.parentElement.innerHTML =
+        '<div class="empty" style="height:100%;display:flex;flex-direction:column;justify-content:center">'
+        + '<b>แสดงกราฟไม่ได้</b>ยังโหลดไลบรารีกราฟไม่สำเร็จ (ต้องใช้อินเทอร์เน็ตครั้งแรก)'
+        + '<div class="hint mt-1">ตัวเลข ตาราง และการส่งออก Excel ในหน้านี้ยังถูกต้องครบถ้วน</div></div>';
+    }
+    return null;
+  }
+  if(!cv) return null;
   if(STATE.charts[canvasId]){ try{ STATE.charts[canvasId].destroy(); }catch(e){} }
   var opt = deepMerge(chartDefaults(), extra||{});
   try{ applyDualAxis_(data, opt); }catch(e){}      // ตกแต่งล้มเหลวต้องไม่ทำให้กราฟไม่ขึ้น
@@ -3864,11 +3987,42 @@ function deepMerge(a,b){
 }
 
 /* กราฟที่ตั้งใจให้อ่านง่ายบนมือถือ: ความสูงยืดหยุ่นตามความกว้างจอ */
-function chartBox(id, h){
+/* หัวคอลัมน์ที่เรียงลำดับได้ (v3.5)
+   ของเดิมเป็น <th> เปล่า ๆ ผูก onclick อย่างเดียว — กดด้วยคีย์บอร์ดไม่ได้เลย
+   และไม่มีตัวบอกสถานะว่าตอนนี้เรียงตามคอลัมน์ไหน ทิศทางใด ซึ่งเป็นปัญหา
+   ของผู้ใช้ทุกคน ไม่ใช่แค่ผู้ใช้ screen reader
+   aria-sort ทำสองหน้าที่พร้อมกัน: screen reader อ่านออก และ CSS ใช้วาดลูกศร */
+function sortableTh(key, label, state){
+  var on  = state && state.key === key;
+  var dir = on ? (state.dir === 1 ? 'ascending' : 'descending') : 'none';
+  return '<th data-k="'+esc(key)+'" scope="col" role="columnheader" tabindex="0"'
+       + ' aria-sort="'+dir+'"'
+       + ' title="คลิกหรือกด Enter เพื่อเรียงตาม '+esc(label)+'">'+esc(label)+'</th>';
+}
+
+/* ผูกทั้งคลิกและคีย์บอร์ดให้หัวตารางในคราวเดียว */
+function bindSortableTh(tableId, onSort){
+  var t = $(tableId); if(!t) return;
+  t.querySelectorAll('thead th[data-k]').forEach(function(h){
+    function go(){ onSort(h.dataset.k); }
+    h.onclick = go;
+    h.onkeydown = function(e){
+      if(e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar'){ e.preventDefault(); go(); }
+    };
+  });
+}
+
+function chartBox(id, h, alt){
   h = h || 300;
   /* ส่งความสูงเป็นตัวแปร CSS ไม่ใช่ height ตรง ๆ
-     เพื่อให้ media query ย่อความสูงบนมือถือได้ (inline style ชนะ media query เสมอ) */
-  return '<div class="chart-box" style="--ch:'+h+'px"><canvas id="'+id+'"></canvas></div>';
+     เพื่อให้ media query ย่อความสูงบนมือถือได้ (inline style ชนะ media query เสมอ)
+
+     canvas ต้องมี role="img" + aria-label ไม่งั้น screen reader อ่านได้แค่ "graphic"
+     เปล่า ๆ · ถ้าผู้เรียกไม่ส่งคำอธิบายมา ใช้หัวข้อการ์ดที่อยู่เหนือกราฟเป็นค่าตั้งต้น
+     ผ่าน aria-labelledby ไม่ได้เพราะการ์ดยังไม่ถูกสร้างตอนเรียกฟังก์ชันนี้ */
+  return '<div class="chart-box" style="--ch:'+h+'px">'
+       + '<canvas id="'+id+'" role="img" aria-label="'+esc(alt||'แผนภูมิข้อมูล — ตัวเลขชุดเดียวกันดูได้จากตารางและการ์ดสรุปในหน้านี้')+'"></canvas>'
+       + '</div>';
 }
 
 /* KPI card — ใช้ซ้ำทุกหน้า จึงทำเป็นฟังก์ชันเดียว */
@@ -4085,6 +4239,10 @@ function renderOverview(){
   var days = filteredDays();
   if(!days.length){ host.innerHTML = card('แดชบอร์ดภาพรวม','', emptyState('ไม่มีข้อมูลในช่วงที่เลือก','ลองขยายช่วงวันที่ หรือปิดตัวกรองประเภทวัน')); return; }
 
+  /* ความละเอียดของกราฟแนวโน้ม: ใช้ค่าที่ผู้ใช้เลือกไว้ถ้ามี ไม่งั้นเลือกตามความยาวช่วง */
+  var ovAuto = !STATE.ovGran;
+  var ovG    = STATE.ovGran || autoGran(days.length);
+
   var cur  = aggregate(days, STATE.filter.floor);
   var prev = aggregate(prevPeriodDays(), STATE.filter.floor);
   var ins  = buildInsights(cur, prev, days);
@@ -4153,10 +4311,20 @@ function renderOverview(){
     + '<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4 mt-4">'+kpis2+'</div>'
 
     + '<div class="mt-4">'
-    + card('แนวโน้มรายวัน', 'ลูกค้าอ่านจากแกนซ้าย (คน) · รถยนต์อ่านจากแกนขวา (คัน) — คนละสเกล จึงเทียบความสูงของเส้นตรง ๆ ไม่ได้',
+    + card('แนวโน้มรายวัน',
+        (ovAuto ? 'ช่วงที่เลือกยาว '+fmt(days.length)+' วัน จึงรวมเป็น'
+                  + ({week:'รายสัปดาห์',month:'รายเดือน'}[ovG] || 'รายวัน')
+                  + 'ให้อัตโนมัติ (กดปุ่มเพื่อเปลี่ยนได้) · '
+                : '')
+        + 'ลูกค้าอ่านจากแกนซ้าย (คน) · รถยนต์อ่านจากแกนขวา (คัน) — คนละสเกล จึงเทียบความสูงของเส้นตรง ๆ ไม่ได้',
         '<div class="flex flex-wrap items-center gap-2 mb-3">'
         + '<div class="seg" id="ovGran">'
-        +   '<button data-g="day" class="on">รายวัน</button><button data-g="week">รายสัปดาห์</button><button data-g="month">รายเดือน</button>'
+        /* ปุ่มต้องสะท้อนความละเอียดที่ใช้จริง ของเดิมติด "รายวัน" ตายตัว
+           ทั้งที่กราฟอาจถูกวาดด้วยความละเอียดอื่น — ผู้ใช้จึงอ่านสถานะผิด */
+        +   ['day','week','month'].map(function(g){
+              return '<button data-g="'+g+'" class="'+(ovG===g?'on':'')+'">'
+                   + ({day:'รายวัน',week:'รายสัปดาห์',month:'รายเดือน'}[g])+'</button>';
+            }).join('')
         + '</div>'
         + '<span class="hint ml-auto">แตะจุดบนกราฟเพื่อดูตัวเลขของวันนั้น</span></div>'
         + chartBox('chTrend', 330),
@@ -4209,13 +4377,22 @@ function renderOverview(){
     b.onclick = function(){
       seg.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); });
       b.classList.add('on');
-      drawTrendChart(cur, days, b.dataset.g);
+      STATE.ovGran = b.dataset.g;          // จำไว้ ไม่งั้นวาดหน้าใหม่แล้วเด้งกลับ
+      drawTrendChart(cur, days, STATE.ovGran);
     };
   });
 }
 
+/* ความละเอียดเริ่มต้นของกราฟแนวโน้ม ต้องเลือกตามความยาวช่วง ไม่ใช่ล็อกเป็นรายวันเสมอ
+   วัดจริงที่ 2,000 วัน: กราฟรายวันมี 6,000 จุด (3 ชุดข้อมูล) หน้าภาพรวมใช้เวลา
+   380–526 ms ทั้งที่การคำนวณเองใช้แค่ 122 ms — ส่วนที่เหลือคือค่าวาดกราฟล้วน ๆ
+   และเส้น 2,000 จุดบนจอกว้าง 1,200 px ก็อ่านอะไรไม่ได้อยู่แล้ว
+   ผู้ใช้ยังกดปุ่มเปลี่ยนความละเอียดเองได้ตามเดิม */
+function autoGran(n){
+  return n > 420 ? 'month' : (n > 120 ? 'week' : 'day');
+}
 function drawOverviewCharts(cur, days, floors, dowStats){
-  drawTrendChart(cur, days, 'day');
+  drawTrendChart(cur, days, STATE.ovGran || autoGran(days.length));
 
   makeChart('chFloor','doughnut', {
     labels: floors.map(function(f){ return f.floor; }),
@@ -4379,9 +4556,11 @@ function renderGates(){
     + '<div class="mt-4">'
     + card('ตารางสรุปรายประตู', 'คลิกหัวคอลัมน์เพื่อเรียงลำดับ',
         '<div class="tbl-wrap" style="max-height:560px"><table class="tbl" id="tblGates"><thead><tr>'
-        + '<th data-k="name">ประตู</th><th data-k="floor">ชั้น</th><th data-k="total">ยอดเข้ารวม</th>'
-        + '<th data-k="avg">เฉลี่ย/วัน</th><th data-k="out">ยอดออกรวม</th><th data-k="max">สูงสุดวันเดียว</th>'
-        + '<th data-k="chg">เทียบช่วงก่อน</th><th class="no-sort">สัดส่วน</th>'
+        + sortableTh('name','ประตู',STATE.gateSort) + sortableTh('floor','ชั้น',STATE.gateSort)
+        + sortableTh('total','ยอดเข้ารวม',STATE.gateSort) + sortableTh('avg','เฉลี่ย/วัน',STATE.gateSort)
+        + sortableTh('out','ยอดออกรวม',STATE.gateSort) + sortableTh('max','สูงสุดวันเดียว',STATE.gateSort)
+        + sortableTh('chg','เทียบช่วงก่อน',STATE.gateSort)
+        + '<th class="no-sort" scope="col">สัดส่วน</th>'
         + '</tr></thead><tbody>'+rows+'</tbody>'
         + '<tfoot><tr><td>รวมทุกประตู</td><td></td><td class="num">'+fmt(total)+'</td>'
         + '<td class="num">'+fmt(safeDiv(total,cur.n))+'</td>'
@@ -4425,14 +4604,11 @@ function renderGates(){
   }, { indexAxis:'y', plugins:{ legend:{display:false} } });
 
   // เรียงตารางเมื่อคลิกหัวคอลัมน์
-  var th = document.querySelectorAll('#tblGates th[data-k]');
-  th.forEach(function(h){
-    h.onclick = function(){
-      var k = h.dataset.k;
-      if(STATE.gateSort.key===k) STATE.gateSort.dir *= -1;
-      else { STATE.gateSort.key=k; STATE.gateSort.dir=-1; }
-      renderGates();
-    };
+  /* ผูกทั้งคลิกและ Enter/Space ผ่านตัวช่วยกลาง เพื่อให้ตารางทุกตัวทำงานเหมือนกัน */
+  bindSortableTh('tblGates', function(k){
+    if(STATE.gateSort.key===k) STATE.gateSort.dir *= -1;
+    else { STATE.gateSort.key=k; STATE.gateSort.dir=-1; }
+    renderGates();
   });
 }
 
@@ -5207,8 +5383,18 @@ function renderDaily(){
      ผู้ใช้ที่บวกคอลัมน์เองหรือส่งออก Excel ไปรวมต่อ จะได้ตัวเลขไม่ตรงกับ footer
      โดยไม่มีอะไรบนหน้าจอบอกว่าทำไม · การเรียงลำดับก็ต้องใช้ค่าชุดเดียวกัน */
   var byFloor = STATE.filter.floor && STATE.filter.floor !== 'all';
-  function rowIn(d){  return byFloor ? sumGatesByFloor(d,'pk','pi','pn',  STATE.filter.floor) : d.s.custIn; }
-  function rowOut(d){ return byFloor ? sumGatesByFloor(d,'pok','po','pno',STATE.filter.floor) : d.s.custOut; }
+  /* คำนวณล่วงหน้าครั้งเดียวต่อวัน แล้วอ่านจาก Map
+     เดิมเรียกซ้ำใน 3 จุด (comparator ของ sort, การคำนวณสุทธิ, เซลล์ในตาราง) โดยไม่จำค่า
+     วัดจริงที่ 2,000 วัน x 40 ประตู กรองชั้น 1: การคลิกหัวคอลัมน์เพื่อเรียง 1 ครั้ง
+     เรียก sumGatesByFloor ถึง 47,374 ครั้ง = ~1.9 ล้านรอบลูป + regex floorOf อีก 1.9 ล้านครั้ง
+     จอค้าง 1.4 วินาทีทุกครั้งที่กดเรียง — การจำค่าลดเหลือ 4,000 ครั้ง (25 เท่า) */
+  var _vIn = new Map(), _vOut = new Map();
+  days.forEach(function(d){
+    _vIn.set(d,  byFloor ? sumGatesByFloor(d,'pk','pi','pn',  STATE.filter.floor) : d.s.custIn);
+    _vOut.set(d, byFloor ? sumGatesByFloor(d,'pok','po','pno',STATE.filter.floor) : d.s.custOut);
+  });
+  function rowIn(d){  return _vIn.get(d); }
+  function rowOut(d){ return _vOut.get(d); }
 
   var s = STATE.dailySort;
   var sorted = days.slice().sort(function(a,b){
@@ -5246,7 +5432,15 @@ function renderDaily(){
     if(d.blank) nBlank++;
   });
 
-  var rows = sorted.map(function(d){
+  /* จำกัดจำนวนแถวที่วาดจริง — ตารางนี้เดิมวาดทุกวันในช่วงโดยไม่มีเพดาน
+     วัดจริงที่ 2,000 วัน: 28,099 DOM node · innerHTML 790 KB · เปิดหน้าค้าง 1.4 วินาที
+     และเลื่อนกระตุกเพราะ node ทั้งหมดอยู่ใน scroll container เดียว (max-height:640px)
+     การส่งออก Excel อ่านจาก filteredDays() ไม่ใช่จาก DOM จึงยังได้ครบทุกวันเสมอ */
+  var DAILY_CAP = 500;
+  var capped = sorted.length > DAILY_CAP;
+  var shown = capped ? sorted.slice(0, DAILY_CAP) : sorted;
+
+  var rows = shown.map(function(d){
     var net = rowIn(d) - rowOut(d);
     return '<tr'+dayClass(d)+'>'
       + '<td>'+esc(thDate(d.d,'medium'))
@@ -5268,13 +5462,18 @@ function renderDaily(){
   }).join('');
 
   host.innerHTML =
-    card('ตารางข้อมูลรายวัน', fmt(days.length)+' วัน · คลิกหัวคอลัมน์เพื่อเรียงลำดับ',
+    card('ตารางข้อมูลรายวัน',
+      (capped ? 'แสดง '+fmt(DAILY_CAP)+' จาก '+fmt(days.length)+' วัน (เรียงตามคอลัมน์ที่เลือก)'
+              : fmt(days.length)+' วัน')
+      + ' · คลิกหัวคอลัมน์เพื่อเรียงลำดับ',
       '<div class="tbl-wrap" style="max-height:640px"><table class="tbl" id="tblDaily"><thead><tr>'
-      + '<th data-k="d">วันที่</th><th data-k="dow">วัน</th><th data-k="custIn">ลูกค้าเข้า</th>'
-      + '<th data-k="custOut">ลูกค้าออก</th><th class="no-sort">สุทธิ</th>'
-      + '<th data-k="carIn">รถเข้า</th><th data-k="carOut">รถออก</th>'
-      + '<th class="no-sort">จยย.</th><th class="no-sort">แท็กซี่</th><th class="no-sort">เดลิเวอรี่</th>'
-      + '<th class="no-sort">จำนวนประตู</th><th class="no-sort">ชื่อแท็บต้นทาง</th>'
+      + sortableTh('d','วันที่',STATE.dailySort) + sortableTh('dow','วัน',STATE.dailySort)
+      + sortableTh('custIn','ลูกค้าเข้า',STATE.dailySort) + sortableTh('custOut','ลูกค้าออก',STATE.dailySort)
+      + '<th class="no-sort" scope="col">สุทธิ</th>'
+      + sortableTh('carIn','รถเข้า',STATE.dailySort) + sortableTh('carOut','รถออก',STATE.dailySort)
+      + '<th class="no-sort" scope="col">จยย.</th><th class="no-sort" scope="col">แท็กซี่</th>'
+      + '<th class="no-sort" scope="col">เดลิเวอรี่</th>'
+      + '<th class="no-sort" scope="col">จำนวนประตู</th><th class="no-sort" scope="col">ชื่อแท็บต้นทาง</th>'
       + '</tr></thead><tbody>'+rows+'</tbody>'
       + '<tfoot><tr><td>รวม '+fmt(days.length)+' วัน</td><td></td>'
       + '<td class="num">'+fmt(cur.custIn)+'</td><td class="num">'+fmt(cur.custOut)+'</td>'
@@ -5288,6 +5487,14 @@ function renderDaily(){
       + '<td class="num">'+fmt(cur.avgCar)+'</td><td class="num">'+fmt(cur.avgCarOut)+'</td>'
       + '<td class="num">'+fmt(safeDiv(cur.moto,cur.n))+'</td><td class="num">'+fmt(safeDiv(cur.taxi,cur.n))+'</td>'
       + '<td class="num">'+fmt(safeDiv(cur.deli,cur.n))+'</td><td></td><td></td></tr></tfoot></table></div>'
+      + (capped
+          ? '<div class="rounded-xl p-3 mt-3 text-[12.5px]" style="background:var(--surface-2);border-left:3px solid var(--brand-2)">'
+            + '<b>แสดง '+fmt(DAILY_CAP)+' แถวแรกจากทั้งหมด '+fmt(days.length)+' วัน</b> '
+            + 'เพื่อให้หน้าเลื่อนได้ลื่น · แถวรวมและค่าเฉลี่ยท้ายตารางคำนวณจาก<b>ทุกวัน</b>ในช่วงที่เลือก '
+            + 'และปุ่มส่งออก Excel ก็ได้ครบทุกวันเช่นกัน · ถ้าต้องการดูวันอื่นบนหน้าจอ '
+            + 'ให้แคบช่วงวันที่ลง หรือคลิกหัวคอลัมน์เพื่อเรียงให้วันที่ต้องการขึ้นมาอยู่ด้านบน'
+            + '</div>'
+          : '')
       + '<div class="legend">'
       +   '<span><i style="background:color-mix(in srgb, var(--p-coral) 30%, var(--surface));'
       +     'box-shadow:inset 3px 0 0 var(--brand)"></i>วันหยุดนักขัตฤกษ์ ('+fmt(nHol)+' วัน)</span>'
@@ -5300,16 +5507,16 @@ function renderDaily(){
       +   (nBlank ? '<span><i style="background:color-mix(in srgb, var(--faint) 13%, var(--surface))"></i>'
       +     'ยังไม่คีย์ข้อมูล ('+fmt(nBlank)+' วัน) — เลข 0 ในแถวนี้ไม่ใช่ยอดจริง</span>' : '')
       + '</div>',
-      '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblDaily\',\'ข้อมูลรายวัน\')">ส่งออก Excel</button>'
+      /* ต้องส่งออกจาก filteredDays() ไม่ใช่ table_to_sheet บน DOM
+         เหตุผลสองข้อ: (1) ตารางถูกจำกัดที่ 500 แถว ถ้าอ่านจาก DOM จะได้ไฟล์ไม่ครบ
+         (2) วัดจริงที่ 2,000 แถว table_to_sheet ใช้ 549 ms ทั้งที่อ่านจากข้อมูลตรง ๆ เร็วกว่ามาก */
+      '<button class="btn btn-sm" onclick="exportDailyXlsx()" title="ส่งออกทุกวันในช่วงที่เลือก ไม่ใช่แค่แถวที่แสดงบนจอ">ส่งออก Excel</button>'
       + '<button class="btn btn-sm" onclick="exportAllXlsx()">ส่งออกทั้งชุด</button>');
 
-  document.querySelectorAll('#tblDaily th[data-k]').forEach(function(h){
-    h.onclick=function(){
-      var k=h.dataset.k;
-      if(STATE.dailySort.key===k) STATE.dailySort.dir*=-1;
-      else { STATE.dailySort.key=k; STATE.dailySort.dir=-1; }
-      renderDaily();
-    };
+  bindSortableTh('tblDaily', function(k){
+    if(STATE.dailySort.key===k) STATE.dailySort.dir*=-1;
+    else { STATE.dailySort.key=k; STATE.dailySort.dir=-1; }
+    renderDaily();
   });
 }
 /* ============================================================================
@@ -5335,6 +5542,15 @@ function renderGateTrend(){
   }
   var gran = STATE.trendGran;
   var dir  = STATE.trendDir;                       // in = ลูกค้าเข้า, out = ลูกค้าออก
+
+  /* ยกระดับความละเอียดอัตโนมัติเมื่อช่วงยาวเกินไป
+     วัดจริงที่ 2,000 วัน x 40 ประตู แล้วกด "เลือกทั้งหมด" + รายวัน:
+     40 ชุดข้อมูล x 2,000 จุด = 80,000 จุดในกราฟเดียว วาดนาน 2,373 ms
+     และ hover หลังจากนั้นกระตุกตลอดเพราะโหมด index ต้องสแกนทุกชุดข้อมูล
+     (ความละเอียดรายสัปดาห์บนข้อมูลชุดเดียวกันใช้เวลา 657 ms) */
+  var granForced = null;
+  if(gran === 'day' && days.length > 400){ granForced = gran; gran = 'week'; }
+  if(gran === 'week' && days.length > 1400){ granForced = granForced || 'week'; gran = 'month'; }
 
   var keyArr  = dir==='out' ? 'pok' : 'pk';
   var valArr  = dir==='out' ? 'po'  : 'pi';
@@ -5410,7 +5626,12 @@ function renderGateTrend(){
     + '</div>'
 
     + '<div class="mt-4">'
-    + card('เส้นแนวโน้มของแต่ละประตู', 'ค่าเฉลี่ยต่อวันในแต่ละช่วง · เลือกประตูได้สูงสุดเท่าที่ต้องการ',
+    + card('เส้นแนวโน้มของแต่ละประตู',
+        (granForced
+          ? 'ช่วงที่เลือกยาว '+fmt(days.length)+' วัน จึงรวมเป็น'
+            + (gran==='month' ? 'รายเดือน' : 'รายสัปดาห์')
+            + 'ให้อัตโนมัติเพื่อให้กราฟอ่านออกและไม่หน่วง · แคบช่วงวันที่ลงเพื่อดูรายวัน'
+          : 'ค่าเฉลี่ยต่อวันในแต่ละช่วง · เลือกประตูได้สูงสุดเท่าที่ต้องการ'),
         '<div class="flex flex-wrap items-center gap-2 mb-3">'
         + '<div class="seg" id="gtGran">'
         +   ['day','week','month'].map(function(g){
@@ -5733,6 +5954,13 @@ function renderVehicles(){
   var beforeOpenBad = beforeOpenRaw < 0;
   var series = groupSeries(cur.byDate, cur.byDate.length>70 ? 'week' : 'day');
 
+  /* จำกัดแถวเหมือนตารางรายวัน — วัดจริงที่ 2,000 วัน: 24,235 DOM node · 639 KB
+     และหน้านี้ยังวาดกราฟอีก 5 ตัวพร้อมกัน จึงหนักกว่าหน้ารายวันอีก */
+  var VEH_CAP = 500;
+  var vAll = days.slice().reverse();
+  var vCapped = vAll.length > VEH_CAP;
+  var vShown = vCapped ? vAll.slice(0, VEH_CAP) : vAll;
+
   host.innerHTML =
       '<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">'+kpis+'</div>'
 
@@ -5781,14 +6009,16 @@ function renderVehicles(){
     + '</div>'
 
     + '<div class="mt-4">'
-    + card('ตารางยานพาหนะรายวัน', 'ทุกประเภทที่ระบบเก็บได้',
+    + card('ตารางยานพาหนะรายวัน',
+        vCapped ? 'แสดง '+fmt(VEH_CAP)+' วันล่าสุด จากทั้งหมด '+fmt(days.length)+' วัน'
+                : 'ทุกประเภทที่ระบบเก็บได้',
         '<div class="tbl-wrap" style="max-height:520px"><table class="tbl" id="tblVeh"><thead><tr>'
         + '<th class="no-sort">วันที่</th><th class="no-sort">วัน</th>'
         + '<th class="no-sort">รถเข้า 24 ชม.</th><th class="no-sort">รถออก 24 ชม.</th><th class="no-sort">สุทธิ</th>'
         + '<th class="no-sort">รถเข้า ≥10:00</th><th class="no-sort">รถออก ≥10:00</th>'
         + '<th class="no-sort">จยย.</th><th class="no-sort">แท็กซี่</th><th class="no-sort">เดลิเวอรี่</th>'
         + '<th class="no-sort">คน/รถ</th></tr></thead><tbody>'
-        + days.slice().reverse().map(function(d){
+        + vShown.map(function(d){
             var pc = safeDiv(d.s.custIn, d.s.carIn);
             return '<tr><td>'+esc(thDate(d.d,'medium'))+(d.hol?' <span class="chip chip-w">'+esc(holidayName(d.d))+'</span>':'')+'</td>'
               + '<td style="text-align:left">'+TH_DOW_FULL[d.dow]+'</td>'
@@ -5798,7 +6028,11 @@ function renderVehicles(){
               + '<td class="num">'+fmt(d.s.moto)+'</td><td class="num">'+fmt(d.s.taxi)+'</td><td class="num">'+fmt(d.s.deli)+'</td>'
               + '<td class="num">'+(pc!==null?fmt1(pc):'—')+'</td></tr>';
           }).join('')
-        + '</tbody></table></div>',
+        + '</tbody></table></div>'
+        + (vCapped
+            ? '<div class="hint mt-2">แสดง '+fmt(VEH_CAP)+' วันล่าสุดเพื่อให้หน้าเลื่อนได้ลื่น · '
+              + 'การ์ดสรุปด้านบนคำนวณจากทุกวันในช่วงที่เลือก และปุ่ม "ส่งออกทั้งชุด" ในหน้ารายวันได้ครบทุกวัน</div>'
+            : ''),
         '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblVeh\',\'ยานพาหนะรายวัน\')">ส่งออก Excel</button>')
     + '</div>';
 
@@ -7648,6 +7882,41 @@ function exportTableXlsx(tableId, name){
 function safeSheetName(n){ return String(n).replace(/[:\\\/?*\[\]]/g,'-').slice(0,31) || 'Sheet1'; }
 
 /* ส่งออกข้อมูลทั้งชุด — หลายชีตในไฟล์เดียว ให้เอาไปทำงานต่อได้เลย */
+/* ส่งออกตารางรายวันจาก "ข้อมูล" ไม่ใช่จากตารางบนหน้าจอ
+   เหตุผล 2 ข้อ:
+   1) ตารางบนจอถูกจำกัดไว้ 500 แถวเพื่อความลื่น ถ้าอ่านจาก DOM ผู้ใช้จะได้ไฟล์ไม่ครบ
+      โดยไม่รู้ตัว ซึ่งอันตรายกว่าหน้าจอช้าเสียอีก
+   2) วัดจริงที่ 2,000 แถว XLSX.utils.table_to_sheet ใช้เวลา 549 ms
+   ยอดลูกค้าเคารพตัวกรองชั้นเหมือนทุกที่ ส่วนยานพาหนะไม่มีข้อมูลชั้นจึงเป็นยอดทั้งศูนย์ */
+function exportDailyXlsx(){
+  if(!needLib('xlsx','สร้าง Excel')) return;
+  var days = filteredDays();
+  if(!days.length){ toast('ไม่มีข้อมูลในช่วงที่เลือก','warn'); return; }
+  try{
+    var fl = STATE.filter.floor;
+    var onFloor = fl && fl !== 'all';
+    var flNote  = onFloor ? ' ('+fl+')' : '';
+    var vehNote = onFloor ? ' (ทั้งศูนย์)' : '';
+    var aoa = [['วันที่ (พ.ศ.)','วันที่ (ค.ศ.)','วันในสัปดาห์','วันหยุด','ยังไม่คีย์ข้อมูล',
+                'ลูกค้าเข้า'+flNote,'ลูกค้าออก'+flNote,'สุทธิ'+flNote,
+                'รถยนต์เข้า'+vehNote,'รถยนต์ออก'+vehNote,
+                'จยย.'+vehNote,'แท็กซี่'+vehNote,'เดลิเวอรี่'+vehNote,
+                'จำนวนประตู','แท็บต้นทาง','ไฟล์ต้นทาง']];
+    days.forEach(function(d){
+      var ci = dayCustIn(d, fl), co = dayCustOut(d, fl);
+      aoa.push([thDate(d.d,'medium'), d.d, TH_DOW_FULL[d.dow], holidayName(d.d)||'',
+                d.blank ? 'ใช่' : '',
+                ci, co, ci-co,
+                d.s.carIn, d.s.carOut, d.s.moto, d.s.taxi, d.s.deli,
+                (d.pi||[]).length, d.sh, d.f]);
+    });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'ข้อมูลรายวัน');
+    XLSX.writeFile(wb, 'SBK_ข้อมูลรายวัน_'+stamp()+'.xlsx');
+    toast('ส่งออก '+fmt(days.length)+' วันเรียบร้อยแล้ว','ok');
+  }catch(e){ console.error(e); toast('ส่งออก Excel ไม่สำเร็จ: '+e.message,'err'); }
+}
+
 function exportAllXlsx(){
   if(!needLib('xlsx','สร้าง Excel')) return;
   var days = filteredDays();
@@ -8112,6 +8381,7 @@ function goView(name){
   }
 
   closeSidebar();
+  setPageOrientation(name);
   try{ location.hash = name; }catch(e){}
 
   if(name!=='settings' && !DATA.days.length){
@@ -8124,10 +8394,53 @@ function goView(name){
   window.scrollTo({ top:0, behavior:'smooth' });
 }
 
+/* เก็บกวาดของเก่าก่อนวาดหน้าใหม่ — เดิมมีแต่ renderAll() ที่ทำ ซึ่งเกิดเฉพาะตอน
+   เปลี่ยนตัวกรอง/สลับธีม/โหลดข้อมูลใหม่ ส่วนการ "กดเมนูเปลี่ยนหน้า" ไม่ล้างอะไรเลย
+
+   วัดจริงที่ 2,000 วัน x 40 ประตู เดินครบ 14 หน้า: DOM ค้าง 59,997 node และ
+   chart มีชีวิตพร้อมกัน 22 ตัว ทุกตัวเป็น responsive:true จึงถูกสั่ง resize ใหม่
+   ทุกครั้งที่ layout เปลี่ยน ผลคือหน้าเดิมยิ่งเปิดซ้ำยิ่งช้าลง
+   (หน้ารายวัน รอบ 1 = 1,406 ms -> รอบ 3 = 1,765 ms)
+
+   ล้าง chart ด้วยเกณฑ์ "canvas หลุดจาก DOM แล้ว" แทนการล้างตามชื่อหน้า เพราะ
+   ครอบเคสที่กราฟบางตัวเลิกถูกวาดไปเองด้วย (เช่น chGateHour ที่สร้างเฉพาะโหมดลูกค้า
+   พอสลับเป็นโหมดรถแล้ว instance เดิมจะค้างถือ canvas ที่ไม่มีใครเห็นไว้ตลอดไป) */
+function sweepStale(){
+  document.querySelectorAll('.view').forEach(function(v){
+    if(v.id !== 'v-'+STATE.view && v.innerHTML) v.innerHTML = '';
+  });
+  Object.keys(STATE.charts).forEach(function(k){
+    var ch = STATE.charts[k];
+    var cv = ch && ch.canvas;
+    if(!cv || !document.body.contains(cv)){
+      try{ if(ch) ch.destroy(); }catch(e){}
+      delete STATE.charts[k];
+    }
+  });
+}
+
+/* @page ไม่รับ selector จึงกำหนดแนวกระดาษตามคลาสไม่ได้
+   ต้องสลับด้วยการเขียนทับ <style> ตัวเดียวที่จองไว้ ตอนเปลี่ยนหน้า
+   หน้า Infographic เป็น A4 แนวตั้ง ที่เหลือเป็นแนวนอน */
+function setPageOrientation(view){
+  try{
+    var st = document.getElementById('pageOrient');
+    if(!st){
+      st = document.createElement('style');
+      st.id = 'pageOrient';
+      document.head.appendChild(st);
+    }
+    st.textContent = (view === 'infographic')
+      ? '@page{ size:A4 portrait; margin:10mm }'
+      : '@page{ size:A4 landscape; margin:10mm }';
+  }catch(e){ /* พิมพ์ผิดแนวยังดีกว่าหน้าพัง */ }
+}
+
 function renderCurrent(){
   var m = VIEW_META[STATE.view];
   if(!m) return;
   cleanupGateSelects();
+  try{ sweepStale(); }catch(e){ console.error(e); }
   try{ updateFilterSummary(); }catch(e){ console.error(e); }
   try{
     m.fn();
@@ -8234,7 +8547,13 @@ function bindEvents(){
     // ขณะเปิดหน้าต่างซ้อนหรือดรอปดาวน์ ให้ Esc ทำงานอย่างเดียว ไม่งั้นกด r/f แล้วเกิดผลข้างเคียงโดยไม่ตั้งใจ
     var overlay = $('modalMask').classList.contains('on') || document.querySelector('.gsel.open');
     if(overlay && e.key!=='Escape') return;
-    if(e.key==='Escape'){ closeModal(); closeSidebar(); }
+    if(e.key==='Escape'){
+      closeModal(); closeSidebar();
+      /* แผงตัวกรองเป็น overlay เหมือนกัน ผู้ใช้ที่เปิดแล้วกด Esc คาดว่าจะปิด
+         (Esc ปิดโมดัล ลิ้นชัก และดรอปดาวน์ประตูได้อยู่แล้ว ขาดแค่ตัวนี้) */
+      var fb = $('filterBar');
+      if(fb && !fb.classList.contains('hidden')) $('btnFilter').click();
+    }
     if(e.key==='r' && !e.ctrlKey && !e.metaKey){ loadData(false); }
     if(e.key==='f'){ $('btnFilter').click(); }
     var idx = parseInt(e.key,10);
