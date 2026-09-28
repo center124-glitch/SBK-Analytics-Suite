@@ -398,6 +398,12 @@ html.dark .kpi-ic{
 .ctx-seg{ overflow-x:auto; -webkit-overflow-scrolling:touch; flex-shrink:0; max-width:100% }
 .ctx-seg::-webkit-scrollbar{ display:none }
 .ctx-more{ margin-left:auto; flex-shrink:0 }
+/* (v4.1) ปุ่มตัวเลขบนกราฟ ชิดขวาคู่กับปุ่มตัวกรอง */
+.ctx-vals{ margin-left:auto; flex-shrink:0 }
+.ctx-vals + .ctx-more{ margin-left:0 }
+.ctx-vals.on{ background:rgba(0,137,96,.10);           /* สำรองสำหรับเบราว์เซอร์ที่ไม่รู้จัก color-mix */
+              background:color-mix(in srgb, var(--accent) 12%, var(--surface));
+              border-color:var(--accent); color:var(--accent) }
 .ctx-chips{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0 }
 .ctx-chip{
   display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700;
@@ -425,6 +431,8 @@ html.dark .kpi-ic{
   .ctx-seg{ width:100% }
   .ctx-more{ padding-left:10px; padding-right:10px }
   .ctx-more span{ display:none }          /* เหลือแต่ไอคอนกรวย ประหยัดที่ให้ชิป */
+  .ctx-vals{ padding-left:10px; padding-right:10px }
+  .ctx-vals span{ display:none }
   .ctx-chip{ font-size:11px }
   .ctx-note{ font-size:11px; gap:5px }
 }
@@ -809,6 +817,80 @@ html.dark #splash .sp-bg{ opacity:.34 }
   #splash .sp-clock{ animation:none; opacity:1; transform:none }
 }
 
+/* ---------------- (v4.1) ระยะห่างและการจัดวางให้เต็มจออย่างพอดี ----------------
+   1) ระยะใต้แถบบริบทเดิม 40px แต่ระหว่างการ์ดอื่น 16px — เกิดจาก space-y ของ <main>
+      ใส่ margin ให้ .view ทั้งที่องค์ประกอบก่อนหน้า (#groupTabs) ถูกซ่อนอยู่
+      จึงเห็นเป็นช่องโหว่ใหญ่ใต้แถบบริบท ผู้ใช้สะท้อนว่า "ห่างกันเกิน"
+   2) .duo / .trio วางตาราง/กราฟเคียงกันบนจอกว้าง — ตารางที่ยืดเต็ม 1,600px
+      ตัวเลขแต่ละคอลัมน์ห่างกันจนสายตาไล่แถวไม่ได้ */
+#content{ padding-top:16px }
+#content > .view, #content > #groupTabs{ margin-top:0 }
+#groupTabs:not(.hidden){ margin-bottom:14px }
+.duo, .trio{ display:grid; grid-template-columns:minmax(0,1fr); gap:16px }
+@media (min-width:1024px){ .trio{ grid-template-columns:repeat(2,minmax(0,1fr)) } }
+@media (min-width:1400px){
+  .duo{ grid-template-columns:repeat(2,minmax(0,1fr)) }
+  .trio{ grid-template-columns:repeat(3,minmax(0,1fr)) }
+}
+@media (max-width:767.98px){ #content{ padding-top:12px } .duo, .trio{ gap:12px } }
+
+/* ---------------- (v4.1) แถบหัว: กล่องทุกใบสูงเท่ากัน ----------------
+   เดิมนาฬิกาสูง ~52px ช่องสถานะ ~34px ปุ่มไอคอน ~38px ปุ่มโหลด ~40px
+   ขอบบน–ล่างจึงไม่ตรงแนวกัน (ภาพที่ผู้ใช้วงแดงมา) — กำหนดความสูงเดียว
+   และใช้กรอบ มุมโค้ง พื้นเดียวกันทุกกล่อง ให้อ่านเป็นแถบเครื่องมือชุดเดียว */
+.topbar{ --hh:44px }   /* มือถือ: 44px = พื้นที่แตะขั้นต่ำตามเกณฑ์ Apple HIG */
+@media (min-width:768px){ .topbar{ --hh:48px } }
+.topbar .hclock{ height:var(--hh); padding-top:0; padding-bottom:0; border-radius:14px; box-sizing:border-box }
+.topbar #statusChip{ height:var(--hh); box-sizing:border-box; border-radius:14px; padding:0 14px; gap:8px }
+.topbar #btnTheme, .topbar #btnFilter{
+  width:var(--hh); height:var(--hh); min-width:var(--hh); min-height:var(--hh);
+  padding:0; justify-content:center; border-radius:14px;
+  background:var(--surface); border:1px solid var(--line) }
+.topbar #btnTheme:hover, .topbar #btnFilter:hover{ background:var(--surface-2) }
+.topbar #btnTheme svg, .topbar #btnFilter svg{ width:18px; height:18px }
+.topbar #btnLoad{ height:var(--hh); min-height:var(--hh); border-radius:14px; padding:0 16px; box-sizing:border-box }
+@media (max-width:767.98px){
+  .topbar #btnTheme, .topbar #btnFilter{ border-color:transparent; background:transparent }
+}
+/* จอแคบกว่า 640px ปุ่มโหลดเหลือแต่ไอคอน (ข้อความ "โหลดข้อมูล" ซ่อนด้วย sm:inline อยู่แล้ว)
+   ต้องซ่อนข้อความตอน "กำลังโหลด…" ด้วย — setBusy() ใส่ <span> ข้อความใหม่เข้ามา
+   ถ้าไม่ซ่อน ปุ่มขนาดตายตัวจะดันเกินขอบ ทำให้ทั้งหน้าเลื่อนแนวนอนได้ 13px ระหว่างโหลด */
+@media (max-width:639.98px){
+  .topbar #btnLoad{ width:var(--hh); padding:0; justify-content:center }
+  .topbar #btnLoad span:not(.spin){ display:none }
+}
+@media (max-width:1279.98px){ .topbar #statusChip{ width:var(--hh); padding:0; justify-content:center } }
+
+/* ---------------- (v4.2) เลื่อนดูทีละส่วน — การ์ดต้องไม่ถูกตัดครึ่ง ----------------
+   ใช้เฉพาะจอใหญ่ที่ใช้เมาส์ (pointer:fine) เท่านั้น
+   บนจอสัมผัส snap ทำให้การปัดรู้สึกหนืดและเด้งกลับ จึงไม่เปิด */
+@media (min-width:1024px) and (pointer:fine){
+  html{ scroll-snap-type:y proximity; scroll-padding-top:86px }
+  .view.on > *, #groupTabs{ scroll-snap-align:start }
+  /* การ์ดกราฟหนึ่งใบต้องอยู่ในจอเดียวได้: หักแถบหัว + หัวการ์ด + ขอบ ≈ 260px */
+  #content .chart-box{ height:clamp(220px, calc(100vh - 260px), var(--ch,300px)) }
+}
+.secnav{ position:fixed; right:12px; bottom:16px; opacity:.9; z-index:40; display:none; flex-direction:column; gap:6px }
+.secnav.on{ display:flex }
+.secnav button{
+  width:40px; height:40px; border-radius:12px; display:grid; place-items:center; cursor:pointer;
+  background:var(--surface); color:var(--text); border:1px solid var(--line);
+  box-shadow:0 10px 24px -14px rgba(15,10,35,.7); transition:transform .12s, opacity .15s }
+.secnav button:hover:not(:disabled){ transform:translateY(-1px); border-color:var(--accent); color:var(--accent) }
+.secnav button:disabled{ opacity:.35; cursor:default }
+.secnav svg{ width:18px; height:18px }
+@media (max-width:1023.98px), (pointer:coarse){ .secnav, .secnav.on{ display:none } }
+@media print{ .secnav{ display:none !important } }
+
+/* (v4.2) การ์ดเปรียบเทียบรายมิติ: กราฟซ้าย ตารางขวา ตารางเลื่อนในกรอบของตัวเอง
+   ความสูงกรอบตารางเท่ากราฟ การ์ดทั้งใบจึงอยู่ในจอเดียวได้ */
+.dim-body{ display:grid; grid-template-columns:minmax(0,1fr); gap:14px }
+@media (min-width:1024px){
+  .dim-body{ grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); align-items:start }
+  .dim-tbl .tbl-wrap{ max-height:clamp(220px, calc(100vh - 260px), 320px); overflow:auto }
+  .dim-tbl thead th{ position:sticky; top:0; z-index:1 }
+}
+
 /* ---------------- รายงาน A4 แนวนอน ----------------
    1123×794 px @96dpi = ขนาด A4 แนวนอนพอดี
    สร้างเป็น container ขนาดคงที่นอกจอ เพื่อให้ภาพที่ export ออกมาคมและไม่เพี้ยนตามขนาดหน้าจอ */
@@ -1180,7 +1262,8 @@ html{ -webkit-text-size-adjust:100%; text-size-adjust:100% }
 }
 /* จอกว้างพิเศษ: จำกัดความกว้างเนื้อหา ไม่ให้ตารางยืดจนสายตาไล่แถวไม่ทัน */
 @media (min-width:1800px){
-  .content-wrap{ max-width:1720px; margin-inline:auto; width:100% }
+  /* (v4.1) ขยายจาก 1720px — จอ 2K/4K เดิมมีขอบว่างข้างละ ~300px ดูเหมือนหน้าไม่เต็มจอ */
+  .content-wrap{ max-width:2080px; margin-inline:auto; width:100% }
 }
 
 /* ---- 10ก. แท็บย่อยของเมนูที่ยุบรวม (v3.6) ----
@@ -1424,6 +1507,11 @@ table.tbl th[aria-sort="descending"]::after{ content:'\25BC'; opacity:1; color:v
       <div class="ctx-row">
         <div class="seg ctx-seg" id="ctxPresets"></div>
         <div class="ctx-chips" id="ctxChips"></div>
+        <!-- (v4.1) สลับตัวเลขบนกราฟ — อยู่แถบนี้เพราะใช้กับทุกหน้า และแถบหัวบนมือถือไม่มีที่ว่างแล้ว -->
+        <button class="btn btn-sm ctx-vals" id="ctxValues" type="button" aria-pressed="true" title="แสดง/ซ่อนตัวเลขบนกราฟทุกหน้า">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M4 18V9M10 18V5M16 18v-6M22 18H2"/><path d="M3 6.5h2M9 2.5h2M15 9h2"/></svg>
+          <span>ตัวเลขบนกราฟ: เปิด</span>
+        </button>
         <button class="btn btn-sm ctx-more" id="ctxMore">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
           <span>ตัวกรองเพิ่มเติม</span>
@@ -1528,7 +1616,7 @@ table.tbl th[aria-sort="descending"]::after{ content:'\25BC'; opacity:1; color:v
    ส่วนที่ 1 · ค่าคงที่ และเครื่องมือพื้นฐาน
 ============================================================================ */
 
-var APP_VERSION = '3.9';
+var APP_VERSION = '4.2';
 
 /* โลโก้ Seacon Bangkae ฝังเป็น data URL — ไฟล์เดียวจบ ไม่ต้องแนบรูปแยก
    มี 2 ชุด: ชุดสีเดิมสำหรับพื้นสว่าง/รายงาน และชุดตัวอักษรสีขาวสำหรับพื้นมืด */
@@ -1560,6 +1648,32 @@ var TH_DOW_ABBR  = ['จ.','อ.','พ.','พฤ.','ศ.','ส.','อา.'];
    ใช้ 2 อย่าง: (1) แยกประเภทวันในตัวกรอง (2) ปรับค่าพยากรณ์ให้ตรงความจริงมากขึ้น
    เพราะวันหยุดยอดลูกค้าต่างจากวันธรรมดาในวันเดียวกันของสัปดาห์อย่างมีนัยสำคัญ */
 var TH_HOLIDAYS = {
+  /* (v4.0) เพิ่มปี 2565–2566 — ตรวจกับประกาศวันหยุดราชการ + มติ ครม. วันหยุดพิเศษ
+     ใช้เกณฑ์เดียวกับปีอื่นในตาราง: วันหยุดนักขัตฤกษ์ + วันหยุดชดเชย + วันหยุดพิเศษ ครม.
+     ไม่รวมวันพืชมงคล (หยุดเฉพาะราชการ ห้างและเอกชนเปิดตามปกติ)
+     16–18 พ.ย. 65 (APEC) หยุดเฉพาะ กทม./นนทบุรี/สมุทรปราการ — รวมไว้เพราะศูนย์อยู่ใน กทม. */
+  '2022-01-01':'วันขึ้นปีใหม่','2022-01-03':'ชดเชยวันขึ้นปีใหม่','2022-02-16':'วันมาฆบูชา',
+  '2022-04-06':'วันจักรี','2022-04-13':'วันสงกรานต์','2022-04-14':'วันสงกรานต์','2022-04-15':'วันสงกรานต์',
+  '2022-05-01':'วันแรงงาน','2022-05-02':'ชดเชยวันแรงงาน','2022-05-04':'วันฉัตรมงคล',
+  '2022-05-15':'วันวิสาขบูชา','2022-05-16':'ชดเชยวันวิสาขบูชา','2022-06-03':'วันเฉลิมฯ พระราชินี',
+  '2022-07-13':'วันอาสาฬหบูชา','2022-07-14':'วันเข้าพรรษา','2022-07-15':'วันหยุดพิเศษ (มติ ครม.)',
+  '2022-07-28':'วันเฉลิมฯ ร.10','2022-07-29':'วันหยุดพิเศษ (มติ ครม.)','2022-08-12':'วันแม่แห่งชาติ',
+  '2022-10-13':'วันนวมินทรมหาราช','2022-10-14':'วันหยุดพิเศษ (มติ ครม.)',
+  '2022-10-23':'วันปิยมหาราช','2022-10-24':'ชดเชยวันปิยมหาราช',
+  '2022-11-16':'วันหยุดพิเศษ (ประชุม APEC)','2022-11-17':'วันหยุดพิเศษ (ประชุม APEC)','2022-11-18':'วันหยุดพิเศษ (ประชุม APEC)',
+  '2022-12-05':'วันพ่อแห่งชาติ','2022-12-10':'วันรัฐธรรมนูญ','2022-12-12':'ชดเชยวันรัฐธรรมนูญ',
+  '2022-12-30':'วันหยุดพิเศษ (มติ ครม.)','2022-12-31':'วันสิ้นปี',
+
+  '2023-01-01':'วันขึ้นปีใหม่','2023-01-02':'ชดเชยวันสิ้นปี/วันขึ้นปีใหม่','2023-03-06':'วันมาฆบูชา',
+  '2023-04-06':'วันจักรี','2023-04-13':'วันสงกรานต์','2023-04-14':'วันสงกรานต์','2023-04-15':'วันสงกรานต์',
+  '2023-04-17':'ชดเชยวันสงกรานต์','2023-05-01':'วันแรงงาน','2023-05-04':'วันฉัตรมงคล',
+  '2023-05-05':'วันหยุดพิเศษ (มติ ครม.)','2023-06-03':'วันวิสาขบูชา / วันเฉลิมฯ พระราชินี',
+  '2023-06-05':'ชดเชยวันวิสาขบูชา / วันเฉลิมฯ พระราชินี','2023-07-28':'วันเฉลิมฯ ร.10',
+  '2023-08-01':'วันอาสาฬหบูชา','2023-08-02':'วันเข้าพรรษา','2023-08-12':'วันแม่แห่งชาติ',
+  '2023-08-14':'ชดเชยวันแม่แห่งชาติ','2023-10-13':'วันนวมินทรมหาราช','2023-10-23':'วันปิยมหาราช',
+  '2023-12-05':'วันพ่อแห่งชาติ','2023-12-10':'วันรัฐธรรมนูญ','2023-12-11':'ชดเชยวันรัฐธรรมนูญ',
+  '2023-12-29':'ชดเชยวันสิ้นปี (เลื่อนมาตามมติ ครม.)','2023-12-31':'วันสิ้นปี',
+
   '2024-01-01':'วันขึ้นปีใหม่','2024-02-26':'ชดเชยวันมาฆบูชา','2024-04-08':'ชดเชยวันจักรี',
   '2024-04-12':'วันสงกรานต์','2024-04-13':'วันสงกรานต์','2024-04-14':'วันสงกรานต์','2024-04-15':'วันสงกรานต์',
   '2024-04-16':'ชดเชยวันสงกรานต์','2024-05-01':'วันแรงงาน','2024-05-06':'ชดเชยวันฉัตรมงคล',
@@ -2051,6 +2165,19 @@ function rawGateKey(n){
    (สตาบัค / สตาร์บัค / Starbucks) การจับด้วยชื่อเต็มจะพลาดทันทีที่พิมพ์ต่างไปนิดเดียว
 ============================================================================ */
 var GATE_MERGE_SEED = [
+  /* (v4.2) ประตูฝั่งโรบินสันเดิม ถูกแบ่งพื้นที่ใหม่เป็น PowerBuy / Nitori / HomePro
+     และประตูคู่ (1, 2) ถูกยุบรวมเป็นจุดเดียว — ข้อมูลย้อนหลังต้องนับรวมเป็นชื่อปัจจุบัน
+     ทุกกติกาในกลุ่มนี้ "ผูกชั้น" (floor) เพราะคำว่า Robinson เดิมมีอยู่ 3 ชั้น
+     และแต่ละชั้นไปรวมกับคนละประตู ถ้าไม่ผูกชั้น ทั้ง 3 ชั้นจะถูกจับเข้ากติกาแรกที่เจอ */
+  { id:'m_powerbuy_b', name:'ประตู PowerBuy ชั้น.B', floor:'ชั้น B',
+    was:'PowerBuy 1 · PowerBuy 2 · Robinson 1 · Robinson 2 (ชั้น.B)',
+    match:['powerbuy','power buy','เพาเวอร์บาย','พาวเวอร์บาย','robinson','โรบินสัน'] },
+  { id:'m_nitori_1', name:'ประตู Nitori ชั้น.1', floor:'ชั้น 1',
+    was:'Robinson 1 · Robinson 2 (ชั้น.1)',
+    match:['nitori','นิโตริ','robinson','โรบินสัน'] },
+  { id:'m_homepro_2', name:'ประตู HomePro ชั้น.2', floor:'ชั้น 2',
+    was:'Robinson 1 · Robinson 2 (ชั้น.2)',
+    match:['homepro','home pro','โฮมโปร','robinson','โรบินสัน'] },
   { id:'m_krungsri', name:'ประตูเมียงรยุน', was:'ประตูกรุงศรีฯ',
     match:['กรุงศรี','krungsri','เมียงรยุน','เมี่ยงรยุน','เมียงรยอน','myeongryun','miangryun'] },
   { id:'m_donki', name:'ประตู Donki (ดองกิ)', was:'ประตูสตาร์บัคส์',
@@ -2074,8 +2201,14 @@ function gateKey(n){
   var raw = rawGateKey(n);
   if(Object.prototype.hasOwnProperty.call(GATE_KEY_CACHE, raw)) return GATE_KEY_CACHE[raw];
   var out = raw, rules = gateMergeRules();
+  var nFloor = null;
   for(var i=0;i<rules.length;i++){
     var r = rules[i], hit = false, list = r.match || [];
+    /* (v4.2) กติกาที่ผูกชั้น ใช้เฉพาะประตูชั้นนั้นเท่านั้น */
+    if(r.floor){
+      if(nFloor === null) nFloor = floorOf(n);
+      if(nFloor !== r.floor) continue;
+    }
 
     /* รายการ exact = คีย์เต็มของชื่อที่ผู้ใช้เลือกจับคู่เอง ต้องเทียบแบบ "ตรงทั้งคีย์"
        เทียบแบบ "มีอยู่ในชื่อ" ไม่ได้ เพราะคีย์เต็มของประตูหนึ่งเป็นส่วนท้ายของอีกประตูได้
@@ -2228,6 +2361,7 @@ var CFG = {
   gateMerge: [],                       // ประตูเปลี่ยนชื่อที่ผู้ใช้จับคู่เพิ่มเอง
   gateMergeOff: [],                    // id ของรายการตั้งต้นที่ผู้ใช้ปิดไว้
   idleMin: 4,                          // พักหน้าจอเมื่อไม่มีการใช้งานกี่นาที (0 = ไม่พัก)
+  showValues: true,                    // (v4.1) แสดงตัวเลขบนกราฟ — สลับได้จากแถบบริบท
   iconUrl: '',                         // URL เต็มของไอคอนแอป (ใช้เมื่ออัปโหลดไฟล์คู่ HTML ไม่ได้)
   refreshMin: 0,                       // 0 = ไม่รีเฟรชอัตโนมัติ
 
@@ -2853,6 +2987,14 @@ function enrichDay(d, iso){
   o.pok = o.pno.map(gateKey);
   o.vik = o.vni.map(gateKey);
   o.vok = o.vno.map(gateKey);
+  /* (v4.2) หลายประตูในวันเดียวกันอาจได้คีย์เดียวกันหลังรวมชื่อ
+     (เช่น Robinson 1 + Robinson 2 ชั้น.B → PowerBuy ชั้น.B) ต้องยุบเป็นรายการเดียว
+     ตั้งแต่ตรงนี้ — ถ้าปล่อยไว้ 2 รายการ จุดที่หาประตูด้วย indexOf จะเห็นแค่ตัวแรก
+     จำนวน "วันที่มีข้อมูล" จะนับซ้ำเป็น 2 เท่า และยอดสูงสุดต่อวันจะเป็นของครึ่งเดียว */
+  collapseGates(o, 'pk',  'pn',  'pi', 'gpi');
+  collapseGates(o, 'pok', 'pno', 'po', 'gpo');
+  collapseGates(o, 'vik', 'vni', 'vi', 'gvi');
+  collapseGates(o, 'vok', 'vno', 'vo', 'gvo');
   /* วันที่ยังไม่ได้คีย์ข้อมูล — ต้องตัดออกจากการหาค่าเฉลี่ย ไม่งั้นค่าเฉลี่ยต่ำผิดจริง
 
      เดิมดูแค่ 4 ช่องสรุป ซึ่งพลาดกรณีที่พบจริง: ตารางรายประตูคีย์ครบแล้ว
@@ -2873,6 +3015,38 @@ function enrichDay(d, iso){
   return o;
 }
 function num(v){ return Number.isFinite(v) ? v : 0; }
+
+/* ยุบรายการประตูที่คีย์ซ้ำกันภายในวันเดียว: บวกยอด บวกยอดรายชั่วโมงทีละช่อง
+   และต่อชื่อดิบไว้ด้วย " + " เพื่อให้หน้าคุณภาพข้อมูลยังบอกได้ว่ารวมมาจากประตูไหนบ้าง */
+function collapseGates(o, kK, nK, vK, hK){
+  var keys = o[kK] || [], names = o[nK] || [], vals = o[vK] || [], hrs = o[hK] || [];
+  var seen = Object.create(null), dup = false, i;
+  for(i=0;i<keys.length;i++){
+    var k0 = keys[i]; if(!k0) continue;
+    if(seen[k0]){ dup = true; break; }
+    seen[k0] = 1;
+  }
+  if(!dup) return;
+  var at = Object.create(null), K = [], N = [], V = [], H = [];
+  for(i=0;i<keys.length;i++){
+    var k = keys[i], v = Number.isFinite(vals[i]) ? vals[i] : 0, row = hrs[i];
+    if(k && (k in at)){
+      var j = at[k];
+      V[j] += v;
+      var nm = names[i] || '';
+      if(nm && (' + ' + N[j] + ' + ').indexOf(' + ' + nm + ' + ') < 0) N[j] = N[j] ? N[j] + ' + ' + nm : nm;
+      if(row){
+        if(!H[j]) H[j] = row.slice();
+        else for(var h=0;h<row.length;h++) H[j][h] = (H[j][h]||0) + (row[h]||0);
+      }
+      continue;
+    }
+    if(k) at[k] = K.length;
+    K.push(k); N.push(names[i] || ''); V.push(v); H.push(row ? row.slice() : undefined);
+  }
+  o[kK] = K; o[nK] = N; o[vK] = V;
+  if(hrs.length) o[hK] = H;
+}
 
 /* สร้างสารบัญประตู — ต้องดูทุกวัน ไม่ใช่แค่วันล่าสุด
    เพราะร้านมีการเปลี่ยนชื่อ (เช่น Starbucks → Donki) และบางชีตพิมพ์ตกหล่น */
@@ -3186,6 +3360,22 @@ function previousRange(from, to){
   /* ต้องอยู่ในเดือนเดียวกันด้วย ไม่ใช่แค่เริ่มวันที่ 1
      ไม่งั้นช่วง "3 เดือนล่าสุด" (1 มิ.ย.–10 ส.ค.) จะถูกเทียบกับ 1–10 พ.ค.
      ซึ่งสั้นกว่าของจริง 3 เท่า แล้วตัวเลข % จะผิดมหาศาล */
+  /* (v4.0) ช่วงที่เป็น "เดือนเต็ม" (เริ่มวันที่ 1 จบวันสุดท้ายของเดือน) ต้องเทียบกับ
+     เดือนเต็มจำนวนเท่ากันย้อนหลัง — เดิม 1–30 ก.ย. ถูกเทียบกับ 1–30 ส.ค. (ขาด 31 ส.ค.)
+     และ 1 ก.ค.–30 ก.ย. ถูกเทียบกับ 31 มี.ค.–30 มิ.ย. (เกินเข้ามาในเดือนมีนาคม 1 วัน)
+     ซึ่งไม่ใช่การเทียบ "ไตรมาสต่อไตรมาส" ตามที่รายงานมาตรฐานใช้ */
+  var toD = toDate(to);
+  if(from.slice(8) === '01' && toD && addDays(to, 1) && addDays(to, 1).slice(8) === '01'){
+    var fy = +from.slice(0,4), fm = +from.slice(5,7), ty = +to.slice(0,4), tm = +to.slice(5,7);
+    var k = (ty*12 + tm) - (fy*12 + fm) + 1;                 // จำนวนเดือนเต็มในช่วง
+    var ps = shiftYm(from.slice(0,7), -k), pe = shiftYm(to.slice(0,7), -k);
+    if(ps && pe){
+      var peY = +pe.slice(0,4), peM = +pe.slice(5,7);
+      var peLast = new Date(peY, peM, 0).getDate();
+      return { from: ps+'-01', to: pe+'-'+String(peLast).padStart(2,'0'),
+               label: k === 1 ? 'เดือนก่อน (ทั้งเดือน)' : (k === 12 ? 'ปีก่อน (12 เดือนเต็ม)' : k+' เดือนก่อนหน้า (เดือนเต็ม)') };
+    }
+  }
   if(from.slice(8) === '01' && from.slice(0,7) === to.slice(0,7)){
     var y = +from.slice(0,4), m = +from.slice(5,7) - 1;
     if(m < 1){ m = 12; y--; }
@@ -3381,6 +3571,8 @@ function bindCtxBar(){
   });
   var more = $('ctxMore');
   if(more) more.onclick = function(){ var b=$('btnFilter'); if(b) b.click(); };
+  var vb = $('ctxValues');
+  if(vb){ vb.onclick = toggleValues; syncValuesBtn(); }
 }
 
 
@@ -3501,6 +3693,11 @@ function accGates(acc, d, keyArr, nameArr, valArr, floorFilter){
     if(floorFilter && floorFilter!=='all' && fl!==floorFilter) continue;
     var g = acc[k] || (acc[k]={ key:k, name:nm, floor:fl, total:0, days:0, max:0, maxDate:null });
     var v = vals[i]||0;
+    /* (v4.2) ประตูที่อยู่ในกติการวมชื่อ ต้องแสดง "ชื่อปัจจุบัน" แม้ดูข้อมูลปีเก่า
+       เดิมใช้ชื่อดิบของวันนั้น ดูช่วงปี 2567 จึงเห็นเป็น "Robinson 1 + Robinson 2 …"
+       ทั้งที่ผู้ใช้ต้องการให้ทุกปีรายงานเป็นชื่อเดียวกัน เทียบข้ามปีได้ทันที */
+    var fixedNm = mergedGateName(k);
+    if(fixedNm){ nm = fixedNm; if(floorOf(nm) !== 'ไม่ระบุ') fl = floorOf(nm); }
     g.name=nm; g.floor=fl; g.total+=v; g.days++;
     if(v>g.max){ g.max=v; g.maxDate=d.d; }
   }
@@ -4403,9 +4600,167 @@ var SBK_PEAK_PLUGIN = {
   }
 };
 var SBK_PLUGINS_READY = false;
+/* ---------------------------------------------------------------------------
+   ตัวเลขบนกราฟ (v4.1) — ปลั๊กอินเขียนเอง ไม่พึ่ง chartjs-plugin-datalabels
+   เพราะไฟล์นี้ต้องเปิดได้ด้วยไฟล์เดียว และไม่อยากเพิ่ม CDN อีกหนึ่งตัวที่อาจโหลดไม่ขึ้น
+
+   กติกากันรก (สิ่งที่ผู้ใช้ขอ: "ขนาดเหมาะสม ดูสบายตา ไม่รก"):
+     · ตัวอักษร 10.5px ตัวหนา มีขอบสีพื้นหลังรอบตัวอักษร อ่านได้แม้ทับเส้นกริด
+     · กราฟเส้นไม่เขียนทุกจุด — เลือกเป็นระยะตามความกว้างกราฟ (≈ 1 ป้ายต่อ 64px)
+       แต่จุดสูงสุด จุดต่ำสุด และจุดสุดท้าย ได้สิทธิ์ก่อนเสมอ เพราะเป็นตัวเลขที่คนอ่านหา
+     · ป้ายที่จะทับป้ายอื่นถูกข้ามทั้งป้าย (ไม่วาดซ้อน) — เช็คด้วยกรอบสี่เหลี่ยม
+     · แท่งที่แคบกว่าตัวเลขเต็ม ใช้รูปย่อ (12.3K) · แคบกว่านั้นอีกไม่เขียน
+     · โดนัท/พาย แสดง % เฉพาะชิ้นที่ใหญ่กว่า 6%
+     · แผนภาพกระจาย ไม่เขียน (จุดเป็นร้อย ๆ จุด เขียนแล้วอ่านไม่ออก)
+   ปิดรายกราฟได้ด้วย options.plugins.sbkValues = { off:true } หรือ dataset.noLabels
+--------------------------------------------------------------------------- */
+function valuesOn(){ return CFG.showValues !== false; }
+function compactNum(v){
+  var a = Math.abs(v);
+  if(a >= 1e6) return (Math.round(v/1e5)/10).toLocaleString('th-TH') + 'M';
+  if(a >= 1e4) return (Math.round(v/100)/10).toLocaleString('th-TH') + 'K';
+  return fmt(v);
+}
+function valueText(v, ds){
+  if(!Number.isFinite(v)) return null;
+  var u = ds && ds.unit;
+  /* ค่าที่มีทศนิยมและน้อยกว่า 100 (เช่น คน/คัน 4.9) ต้องเก็บทศนิยมไว้ ไม่งั้น 4.9 กลายเป็น 5 */
+  var s = (Math.abs(v) < 100 && Math.round(v) !== v) ? fmt1(v) : fmt(v);
+  return u === '%' ? s + '%' : s;
+}
+var SBK_VALUE_PLUGIN = {
+  id: 'sbkValues',
+  afterDatasetsDraw: function(chart, args, opts){
+    if(!valuesOn() || (opts && opts.off)) return;
+    var type = chart.config.type;
+    if(type === 'scatter' || type === 'bubble' || type === 'radar') return;
+    var area = chart.chartArea, c = chart.ctx;
+    if(!area) return;
+    var taken = [];
+    function free(r){
+      for(var i=0;i<taken.length;i++){
+        var t = taken[i];
+        if(r.x < t.x + t.w && r.x + r.w > t.x && r.y < t.y + t.h && r.y + r.h > t.y) return false;
+      }
+      return true;
+    }
+    /* ป้าย "สูงสุด" ของปลั๊กอินจุดพีคจองที่ไว้ก่อน ตัวเลขจะได้ไม่ไปทับ */
+    var pk = chart.options.plugins && chart.options.plugins.sbkPeak;
+    var halo = cssVar('--surface') || '#fff', ink = cssVar('--text') || '#11241C';
+    c.save();
+    c.font = '700 10.5px Sarabun, sans-serif';
+    c.textBaseline = 'middle';
+    c.lineJoin = 'round';
+    function draw(txt, x, y, align, color){
+      var w = c.measureText(txt).width, h = 14;
+      var rx = align === 'left' ? x : (align === 'right' ? x - w : x - w/2);
+      var r = { x:rx - 2, y:y - h/2, w:w + 4, h:h };
+      if(r.y < area.top - 8 || r.y + r.h > area.bottom + 8) return false;
+      if(r.x < area.left - 6 || r.x + r.w > area.right + 6) return false;
+      if(!free(r)) return false;
+      taken.push(r);
+      c.textAlign = align;
+      c.lineWidth = 3.2; c.strokeStyle = halo; c.strokeText(txt, x, y);
+      c.fillStyle = color || ink; c.fillText(txt, x, y);
+      return true;
+    }
+    function colorOf(ds){
+      var col = typeof ds.borderColor === 'string' && ds.borderColor !== 'transparent' ? ds.borderColor
+              : (typeof ds.backgroundColor === 'string' ? ds.backgroundColor : null);
+      /* สีพื้นที่เป็น rgba โปร่งแสง อ่านไม่ออกเมื่อใช้เป็นสีตัวอักษร → ใช้สีตัวหนังสือหลักแทน */
+      return (!col || /rgba?\(.*,\s*0?\.\d+\)/.test(col)) ? ink : col;
+    }
+
+    try{
+      if(type === 'doughnut' || type === 'pie'){
+        chart.data.datasets.forEach(function(ds, di){
+          if(!chart.isDatasetVisible(di) || ds.noLabels) return;
+          var meta = chart.getDatasetMeta(di);
+          var vals = (ds.data||[]).map(function(v){ return Number.isFinite(v) ? v : 0; });
+          var tot = sum(vals); if(!(tot > 0)) return;
+          meta.data.forEach(function(arc, i){
+            if(!arc || !chart.getDataVisibility(i)) return;
+            var p = vals[i] / tot; if(p < 0.06) return;
+            var pos = arc.tooltipPosition();
+            draw(fmt1(p*100) + '%', pos.x, pos.y, 'center', ink);
+          });
+        });
+        c.restore(); return;
+      }
+
+      var horiz = chart.options.indexAxis === 'y';
+      var perLabel = 64;
+      chart.data.datasets.forEach(function(ds, di){
+        if(!chart.isDatasetVisible(di) || ds.noLabels) return;
+        var meta = chart.getDatasetMeta(di);
+        var els = meta.data || [], n = els.length; if(!n) return;
+        var kind = meta.type || type;
+        var raw = ds.data || [];
+        function valAt(i){
+          var r = raw[i];
+          if(r && typeof r === 'object') r = horiz ? r.x : r.y;
+          return Number.isFinite(r) ? r : null;
+        }
+        var order = [];
+        if(kind === 'line'){
+          var hi = -1, lo = -1, last = -1;
+          for(var i=0;i<n;i++){
+            var v = valAt(i); if(v === null) continue;
+            if(hi < 0 || v > valAt(hi)) hi = i;
+            if(lo < 0 || v < valAt(lo)) lo = i;
+            last = i;
+          }
+          var maxL = Math.max(3, Math.floor((area.right - area.left) / perLabel));
+          var step = Math.max(1, Math.ceil(n / maxL));
+          [hi, lo, last].forEach(function(i){ if(i >= 0 && order.indexOf(i) < 0) order.push(i); });
+          for(var j=0;j<n;j+=step) if(order.indexOf(j) < 0) order.push(j);
+        } else {
+          for(var k=0;k<n;k++) order.push(k);
+        }
+        var col = kind === 'line' ? colorOf(ds) : ink;
+        order.forEach(function(i){
+          if(pk && pk.text && (pk.dataset||0) === di && pk.index === i) return;
+          var v = valAt(i), el = els[i];
+          if(v === null || !el || el.skip) return;
+          var txt = valueText(v, ds); if(!txt) return;
+          if(kind === 'line'){
+            draw(txt, el.x, el.y - 11, 'center', col);
+            return;
+          }
+          /* แท่ง: ถ้าตัวเลขเต็มกว้างกว่าแท่ง ใช้รูปย่อ ถ้ายังไม่พอก็ไม่เขียน */
+          var bw = horiz ? Infinity : Math.abs(el.width || 0);
+          var tw = c.measureText(txt).width;
+          if(tw > bw + 10){ txt = compactNum(v); tw = c.measureText(txt).width; }
+          if(tw > bw + 10) return;
+          if(horiz) draw(txt, el.x + 5, el.y, 'left', ink);
+          else      draw(txt, el.x, v >= 0 ? el.y - 9 : el.y + 9, 'center', ink);
+        });
+      });
+    }catch(e){ /* ป้ายตัวเลขเป็นของเสริม — พังเมื่อไหร่ต้องไม่ลากกราฟทั้งตัวพังตาม */ }
+    c.restore();
+  }
+};
+
+/* สลับเปิด/ปิดตัวเลขบนกราฟ — จำค่าไว้ใน CFG เพื่อให้เปิดแอปครั้งถัดไปยังเป็นแบบเดิม
+   ต้องวาดหน้าใหม่ ไม่ใช่แค่ chart.update() เพราะต้องเผื่อที่ว่างเหนือแท่ง (grace)
+   ซึ่งกำหนดตอนสร้างกราฟ */
+function toggleValues(){
+  CFG.showValues = !valuesOn(); saveCfg();
+  syncValuesBtn();
+  try{ renderCurrent(); }catch(e){}
+  toast(valuesOn() ? 'แสดงตัวเลขบนกราฟแล้ว' : 'ซ่อนตัวเลขบนกราฟแล้ว', 'ok', 2200);
+}
+function syncValuesBtn(){
+  var b = $('ctxValues'); if(!b) return;
+  var on = valuesOn();
+  b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  b.classList.toggle('on', on);
+  var t = b.querySelector('span'); if(t) t.textContent = on ? 'ตัวเลขบนกราฟ: เปิด' : 'ตัวเลขบนกราฟ: ปิด';
+}
+
 function ensureChartPlugins(){
   if(SBK_PLUGINS_READY || typeof Chart === 'undefined') return;
-  try{ Chart.register(SBK_PEAK_PLUGIN); SBK_PLUGINS_READY = true; }catch(e){}
+  try{ Chart.register(SBK_PEAK_PLUGIN, SBK_VALUE_PLUGIN); SBK_PLUGINS_READY = true; }catch(e){}
 }
 
 /* ไล่ระดับสีใต้เส้นกราฟตามโซนความหนาแน่น — สีเปลี่ยนตาม "ความสูง" ของค่า
@@ -4460,6 +4815,12 @@ function makeChart(canvasId, type, data, extra){
   if(STATE.charts[canvasId]){ try{ STATE.charts[canvasId].destroy(); }catch(e){} }
   var opt = deepMerge(chartDefaults(), extra||{});
   try{ applyDualAxis_(data, opt); }catch(e){}      // ตกแต่งล้มเหลวต้องไม่ทำให้กราฟไม่ขึ้น
+  /* (v4.1) เปิดตัวเลขบนกราฟ: ขยายแกนค่าออกไปอีก 10% ไม่งั้นตัวเลขของแท่งที่สูงที่สุด
+     จะชนขอบบนแล้วถูกตัดทิ้ง (ปลั๊กอินไม่วาดป้ายที่ล้นพื้นที่กราฟ) */
+  if(valuesOn() && type !== 'doughnut' && type !== 'pie' && type !== 'scatter' && opt.scales){
+    var vAxes = opt.indexAxis === 'y' ? ['x'] : ['y', 'y1'];
+    vAxes.forEach(function(k){ if(opt.scales[k] && opt.scales[k].grace === undefined) opt.scales[k].grace = '10%'; });
+  }
   try{
     STATE.charts[canvasId] = new Chart(cv.getContext('2d'), { type:type, data:data, options:opt });
   }catch(e){ console.error('chart '+canvasId, e); return null; }
@@ -5821,16 +6182,14 @@ function renderCompare(){
     + '<div class="mt-4">' + cmpMultiBase(aFrom, aTo, A, pick, f.floor) + '</div>'
     + '<div class="mt-4" id="cmpDimHost"></div>'
 
-    + '<div class="mt-4">'
+    /* (v4.1) ตารางภาพรวมคู่กับตารางรายประตูบนจอกว้าง */
+    + '<div class="duo mt-4">'
     + card('ตารางเปรียบเทียบภาพรวม', esc(LB.a)+' = '+thDate(aFrom,'medium')+'–'+thDate(aTo,'medium')+' ('+A.n+' วัน) · '+esc(LB.b)+' = '+thDate(bFrom,'medium')+'–'+thDate(bTo,'medium')+' ('+B.n+' วัน)',
         '<div class="tbl-wrap"><table class="tbl" id="tblCmp"><thead><tr>'
         + '<th class="no-sort">ตัวชี้วัด</th><th class="no-sort">รวม '+esc(LB.a)+'</th><th class="no-sort">รวม '+esc(LB.b)+'</th>'
         + '<th class="no-sort">เฉลี่ย/วัน '+esc(LB.a)+'</th><th class="no-sort">เฉลี่ย/วัน '+esc(LB.b)+'</th><th class="no-sort">ผลต่าง/วัน</th><th class="no-sort">เปลี่ยนแปลง</th>'
         + '</tr></thead><tbody>'+rows+'</tbody></table></div>',
         '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblCmp\',\'เปรียบเทียบช่วงเวลา\')">ส่งออก Excel</button>')
-    + '</div>'
-
-    + '<div class="mt-4">'
     + card('เทียบรายประตู (20 อันดับแรก)', 'ค่าเฉลี่ยต่อวัน',
         '<div class="tbl-wrap" style="max-height:520px"><table class="tbl" id="tblCmpGate"><thead><tr>'
         + '<th class="no-sort">ประตู</th><th class="no-sort">ชั้น</th><th class="no-sort">'+esc(LB.a)+' (เฉลี่ย/วัน)</th>'
@@ -6056,8 +6415,12 @@ function renderCmpDim(A, B, LB){
           return '<button type="button" role="tab" data-d="'+d.k+'" aria-selected="'+(d.k===dim)+'" class="'+(d.k===dim?'on':'')+'">'+esc(d.t)+'</button>';
         }).join('')
       + '</div>'
-      + (chartable ? '<div class="mt-3">'+chartBox('chCmpDim', 300, 'กราฟเปรียบเทียบรายมิติของสองช่วงเวลา')+'</div>' : '')
-      + '<div class="mt-3">'+body+'</div>',
+      /* (v4.2) กราฟกับตารางวางคู่กันบนจอ ≥1024px — เดิมเรียงบนลงล่าง
+         การ์ดสูง 1,100px เกินความสูงจอ เลื่อนมาแล้วเห็นกราฟครึ่งเดียวหรือตารางครึ่งเดียวเสมอ */
+      + (chartable
+          ? '<div class="dim-body mt-3"><div>'+chartBox('chCmpDim', 320, 'กราฟเปรียบเทียบรายมิติของสองช่วงเวลา')+'</div>'
+            + '<div class="dim-tbl">'+body+'</div></div>'
+          : '<div class="mt-3">'+body+'</div>'),
       rows.length ? '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblCmpDim\',\'เปรียบเทียบรายมิติ\')">ส่งออก Excel</button>' : '');
 
   if(chartable){
@@ -6636,10 +6999,12 @@ function renderStats(){
         + 'ต้องมีข้อมูลอย่างน้อยกลุ่มละ 1 วัน ลองขยายช่วงวันที่หรือเลือกกลุ่มวันใหม่')
     : '<div class="tbl-wrap"><table class="tbl" id="tblStatPair"><thead><tr>'
       + '<th class="no-sort">ตัวชี้วัด</th>'
-      + '<th class="no-sort">เฉลี่ย/วัน · '+esc(gA.label)+'</th>'
-      + '<th class="no-sort">เฉลี่ย/วัน · '+esc(gB.label)+'</th>'
-      + '<th class="no-sort">ผลต่าง/วัน</th><th class="no-sort">ส่วนต่าง %</th>'
-      + '<th class="no-sort">SD กลุ่ม 1</th><th class="no-sort">SD กลุ่ม 2</th>'
+      /* (v4.1) หัวคอลัมน์สั้นลง — ตารางนี้วางครึ่งจอแล้ว ชื่อกลุ่มเต็มทำให้ต้องเลื่อนแนวนอน
+         ชื่อกลุ่มเต็มยังอยู่ในบรรทัดคำอธิบายใต้หัวการ์ด และใน title ของหัวคอลัมน์ */
+      + '<th class="no-sort" title="'+esc(gA.label)+'">กลุ่ม 1<div class="hint" style="font-weight:500">เฉลี่ย/วัน</div></th>'
+      + '<th class="no-sort" title="'+esc(gB.label)+'">กลุ่ม 2<div class="hint" style="font-weight:500">เฉลี่ย/วัน</div></th>'
+      + '<th class="no-sort">ผลต่าง/วัน</th><th class="no-sort">ส่วนต่าง</th>'
+      + '<th class="no-sort">SD 1</th><th class="no-sort">SD 2</th>'
       + '</tr></thead><tbody>'+pairRows+'</tbody></table></div>';
 
   /* ---- MoM / YoY ของเดือนล่าสุดในช่วงที่เลือก ---- */
@@ -6674,27 +7039,12 @@ function renderStats(){
         '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblStatAll\',\'สถิติรายตัวชี้วัด\')">ส่งออก Excel</button>')
     + '</div>'
 
-    + '<div class="mt-4">'
-    + card('เปรียบเทียบกลุ่มวันที่เลือกเอง', gA.label+' เทียบกับ '+gB.label, pairBody,
+    /* (v4.1) จอกว้าง: ตารางเทียบกลุ่มคู่กับตาราง MoM/YoY และกราฟ 3 ตัวอยู่แถวเดียว
+       เดิมตารางยืดเต็ม 1,600px คอลัมน์ตัวเลขห่างกันจนไล่สายตาข้ามแถวไม่ได้ */
+    + '<div class="duo mt-4">'
+    + card('เปรียบเทียบกลุ่มวันที่เลือกเอง', 'กลุ่ม 1 = '+gA.label+' · กลุ่ม 2 = '+gB.label, pairBody,
         (dA.length && dB.length)
           ? '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblStatPair\',\'เทียบกลุ่มวัน\')">ส่งออก Excel</button>' : '')
-    + '</div>'
-
-    + '<div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">'
-    + card('เทียบยอดลูกค้าสองกลุ่มวัน', 'ค่าเฉลี่ยต่อวัน (คน)', chartBox('chStatCust', 280))
-    + card('เทียบยอดรถยนต์สองกลุ่มวัน', 'ค่าเฉลี่ยต่อวัน (คัน)', chartBox('chStatCar', 280))
-    + '</div>'
-
-    + '<div class="mt-4">'
-    + card('ความสัมพันธ์ ลูกค้าเข้า กับ รถยนต์เข้า',
-        'แต่ละจุดคือหนึ่งวันในช่วงที่เลือก · ค่า r = '+fmtR(rCC)+' ('+rLab.text+')',
-        chartBox('chStatScatter', 320, 'แผนภาพกระจายแสดงยอดลูกค้าเข้าเทียบกับยอดรถยนต์เข้าในแต่ละวัน')
-        + '<div class="hint mt-3" style="line-height:1.7">'
-        + esc(statCorrNote(rCC, st.custIn.n))
-        + '</div>')
-    + '</div>'
-
-    + '<div class="mt-4">'
     + card('อัตราเติบโตรายเดือน (MoM) และเทียบปีก่อน (YoY)',
         'เดือนเป้าหมาย '+thMonth(curYm)+' · คิดจากค่าเฉลี่ยต่อวันเพื่อไม่ให้จำนวนวันในเดือนบิดผล',
         '<div class="tbl-wrap"><table class="tbl" id="tblStatGrow"><thead><tr>'
@@ -6704,6 +7054,17 @@ function renderStats(){
         + '</tr></thead><tbody>'+growRows+'</tbody></table></div>'
         + '<div class="hint mt-3">ต้องการภาพรายเดือนแบบเต็ม เลือกแท็บ “ภาพรายเดือน / รายปี” ด้านบนได้</div>',
         '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblStatGrow\',\'อัตราเติบโต\')">ส่งออก Excel</button>')
+    + '</div>'
+
+    + '<div class="trio mt-4">'
+    + card('เทียบยอดลูกค้าสองกลุ่มวัน', 'ค่าเฉลี่ยต่อวัน (คน)', chartBox('chStatCust', 280))
+    + card('เทียบยอดรถยนต์สองกลุ่มวัน', 'ค่าเฉลี่ยต่อวัน (คัน)', chartBox('chStatCar', 280))
+    + card('ความสัมพันธ์ ลูกค้าเข้า กับ รถยนต์เข้า',
+        'แต่ละจุดคือหนึ่งวันในช่วงที่เลือก · ค่า r = '+fmtR(rCC)+' ('+rLab.text+')',
+        chartBox('chStatScatter', 280, 'แผนภาพกระจายแสดงยอดลูกค้าเข้าเทียบกับยอดรถยนต์เข้าในแต่ละวัน')
+        + '<div class="hint mt-3" style="line-height:1.7">'
+        + esc(statCorrNote(rCC, st.custIn.n))
+        + '</div>')
     + '</div>';
 
   /* ---- กราฟ ---- */
@@ -7727,7 +8088,7 @@ function gateMergePanel(){
               ? '<div class="mt-1.5 flex flex-wrap gap-1.5">'
                 + names.map(function(a, ix){
                     return (ix ? '<span class="hint" style="align-self:center">→</span> ' : '')
-                         + '<span class="chip chip-0">'+esc(bareGate(a.name))+' · '
+                         + '<span class="chip chip-0">'+esc(String(a.name).split(' + ').map(bareGate).join(' + '))+' · '
                          + esc(thDate(a.first,'short'))+'–'+esc(thDate(a.last,'short'))
                          + ' ('+fmt(a.days)+' วัน)</span>'; }).join(' ')
                 + '</div>'
@@ -8691,6 +9052,23 @@ function buildReportPages(days){
   var cur  = aggregate(days, STATE.filter.floor);
   var prev = aggregate(prevPeriodDays(), STATE.filter.floor);
   var period = thDate(STATE.filter.from,'medium')+' – '+thDate(STATE.filter.to,'medium');
+
+  /* (v4.0) ความครบถ้วนของข้อมูล "เฉพาะช่วงของรายงาน"
+     เดิมใช้ตัวเลขของทั้งฐานข้อมูล (เช่น ยังไม่คีย์ 7 วัน จากข้อมูล 1,004 วัน)
+     แล้วเขียนกำกับว่า "ตัวเลขในรายงานนี้ไม่รวมวันดังกล่าว" — ผู้อ่านเข้าใจว่า
+     รายงานเดือนนี้ขาดไป 7 วัน ทั้งที่ 7 วันนั้นอาจอยู่คนละปี */
+  var rf = STATE.filter.from || (DATA.days[0] && DATA.days[0].d) || '';
+  var rt = STATE.filter.to   || (DATA.days.length && DATA.days[DATA.days.length-1].d) || '';
+  function inRp(iso){ return typeof iso === 'string' && iso >= rf && iso <= rt; }
+  var PQ = {
+    have:     DATA.days.filter(function(d){ return inRp(d.d) && !d.blank; }).length,
+    blank:    ISS().blankDays.filter(inRp).length,
+    missing:  ISS().missingDays.filter(inRp).length,
+    mismatch: ISS().mismatch.filter(function(m){ return inRp(m && m.date); }).length,
+    holidays: days.filter(function(d){ return d.hol; }).length
+  };
+  var docNo = 'SBK-RPT-' + (isIso(rf) ? (beYear(rf) + '-' + rf.slice(5,7)) : '—')
+            + (isIso(rf) && isIso(rt) && rf.slice(0,7) !== rt.slice(0,7) ? '-' + (beYear(rt) + '-' + rt.slice(5,7)) : '');
   /* คำนวณความหนาแน่นไว้ตั้งแต่ต้น เพราะบทสรุปผู้บริหารในหน้า 1 ต้องใช้ค่านี้ด้วย
      ไม่ใช่แค่กราฟในหน้า 3 (ถ้าคำนวณทีหลัง ตัวแปรจะยังเป็น undefined ตอนเขียนบทสรุป) */
   var dp = densityAvg(days, 'p', densOptOf('p')), dc = densityAvg(days, 'c', densOptOf('c'));
@@ -8785,10 +9163,10 @@ function buildReportPages(days){
         + ' น.</b> เฉลี่ย <b>' + fmt(dp.peak) + ' คน</b>');
     }
     var warn = [];
-    if(ISS().blankDays.length)   warn.push('ยังไม่คีย์ข้อมูล ' + fmt(ISS().blankDays.length) + ' วัน');
-    if(ISS().missingDays.length) warn.push('ไม่มีชีต ' + fmt(ISS().missingDays.length) + ' วัน');
+    if(PQ.blank)   warn.push('ยังไม่คีย์ข้อมูล ' + fmt(PQ.blank) + ' วัน');
+    if(PQ.missing) warn.push('ไม่มีชีต ' + fmt(PQ.missing) + ' วัน');
     var note = warn.length
-      ? '<div style="margin-top:6px;color:#C42A46;font-size:9.5px">ข้อควรทราบ: ' + warn.join(' · ')
+      ? '<div style="margin-top:6px;color:#C42A46;font-size:9.5px">ข้อควรทราบ (ในช่วงของรายงานนี้): ' + warn.join(' · ')
         + ' — ตัวเลขในรายงานนี้ไม่รวมวันดังกล่าว</div>'
       : '';
     return '<div style="background:#fffaf6;border:1px solid #f0dbd1;border-left:3px solid #C42A46;'
@@ -8959,19 +9337,75 @@ function buildReportPages(days){
           + '</div>')
     + '</div>'
     + '<div style="margin-top:12px">'
-    +   a4Box('ความครบถ้วนของข้อมูล',
+    +   a4Box('ความครบถ้วนของข้อมูล (เฉพาะช่วงของรายงาน)',
           '<div style="display:flex;gap:20px;font-size:10px;line-height:1.8">'
           + '<div><b style="font-size:20px;color:'+(ISS().score.pct>=90?'#008960':'#A97A00')+'">'+fmt1(ISS().score.pct)+'%</b>'
-          +   '<div style="color:#54685C">คะแนนคุณภาพ · ระดับ '+esc(ISS().score.grade)+'</div></div>'
+          +   '<div style="color:#54685C">คะแนนคุณภาพทั้งฐานข้อมูล · ระดับ '+esc(ISS().score.grade)+'</div></div>'
           + '<div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
-          +   a4Stat('วันที่มีข้อมูล', fmt(ISS().totalDays)+' วัน')
-          +   a4Stat('วันที่ยังไม่มีชีต', fmt(ISS().missingDays.length)+' วัน')
-          +   a4Stat('วันที่ยังไม่คีย์', fmt(ISS().blankDays.length)+' วัน')
-          +   a4Stat('ยอดรวมไม่ตรง', fmt(ISS().mismatch.length)+' รายการ')
+          +   a4Stat('วันที่มีข้อมูล', fmt(PQ.have)+' วัน')
+          +   a4Stat('วันที่ยังไม่มีชีต', fmt(PQ.missing)+' วัน')
+          +   a4Stat('วันที่ยังไม่คีย์', fmt(PQ.blank)+' วัน')
+          +   a4Stat('ยอดรวมไม่ตรง', fmt(PQ.mismatch)+' รายการ')
           + '</div></div>')
     + '</div>', 4);
 
-  return [p1, p2, p3, p4];
+  /* --------- หน้า 5: นิยามตัวชี้วัด วิธีคำนวณ และการรับรองรายงาน (v4.0) ---------
+     รายงานที่ส่งผู้บริหารต้อง "ตรวจย้อนได้" — ผู้อ่านคนละคนต้องตีความตัวเลขตรงกัน
+     และมีผู้รับผิดชอบลงนาม ตามมาตรฐานเอกสารราชการ/องค์กร
+     แยกเป็นหน้าของตัวเองแทนการแทรกท้ายหน้า 4 เพราะหน้า 4 เต็มพื้นที่แล้ว
+     การอัดเพิ่มจะล้นขอบ A4 ตอนส่งออก PDF */
+  function defRow(t, d){
+    return '<tr><td style="padding:5px 8px;border-bottom:1px solid #F5E0D6;font-weight:700;white-space:nowrap;vertical-align:top">'+t+'</td>'
+         + '<td style="padding:5px 8px;border-bottom:1px solid #F5E0D6;color:#34463C">'+d+'</td></tr>';
+  }
+  function sign(role){
+    return '<div style="text-align:center;font-size:10.5px;line-height:1.9">'
+         + '<div style="height:44px"></div>'
+         + '<div>ลงชื่อ ........................................................</div>'
+         + '<div>( ........................................................ )</div>'
+         + '<div>ตำแหน่ง ....................................................</div>'
+         + '<div><b>'+role+'</b> · วันที่ ....... / ....... / ...........</div></div>';
+  }
+  var p5 = a4Page('นิยามตัวชี้วัด วิธีคำนวณ และการรับรองรายงาน', period,
+      '<div style="display:grid;grid-template-columns:1.35fr 1fr;gap:14px">'
+    +   a4Box('นิยามและวิธีคำนวณ',
+          '<table style="width:100%;border-collapse:collapse;font-size:9.5px;line-height:1.6">'
+          + defRow('ลูกค้าเข้า / ออก', 'ผลรวมจำนวนคนผ่านเครื่องนับทุกประตู ตามไฟล์ต้นทางรายวัน (หน่วย: คน)')
+          + defRow('รถยนต์ (24 ชม.)', 'จำนวนรถผ่านช่องทางเข้า–ออกลานจอดตลอด 24 ชั่วโมง (หน่วย: คัน)')
+          + defRow('ค่าเฉลี่ยต่อวัน', 'ยอดรวม ÷ จำนวนวันที่มีข้อมูลจริง — ไม่นับวันที่ยังไม่คีย์และวันที่ไม่มีชีต')
+          + defRow('% เปลี่ยนแปลง', '(ค่าเฉลี่ยต่อวันช่วงนี้ − ช่วงเทียบ) ÷ ช่วงเทียบ × 100 · เทียบค่าเฉลี่ยต่อวันเสมอ เพราะจำนวนวันของสองช่วงไม่เท่ากัน')
+          + defRow('ช่วงเทียบ', 'ช่วงวันเดียวกันของเดือนก่อน (หรือช่วงก่อนหน้าที่ยาวเท่ากัน) · ปีก่อนเลื่อน 52 สัปดาห์ให้ตรงวันในสัปดาห์')
+          + defRow('ลูกค้าต่อรถ 1 คัน', 'ลูกค้าเข้ารวม ÷ รถยนต์เข้ารวม ของช่วงเดียวกัน')
+          + defRow('ความหนาแน่น', 'จำนวนที่อยู่ในศูนย์ ณ ชั่วโมงนั้น = ยอดตั้งต้น + สะสม(เข้า − ออก) ปัดค่าติดลบเป็น 0')
+          + defRow('วันหยุด', 'วันหยุดนักขัตฤกษ์ + ชดเชย + วันหยุดพิเศษตามมติ ครม. (ตารางในระบบครอบคลุม พ.ศ. ' + (HOLIDAY_YEARS.from+543) + '–' + (HOLIDAY_YEARS.to+543) + ') · ช่วงนี้มี ' + fmt(PQ.holidays) + ' วัน')
+          + '</table>')
+    +   a4Box('ขอบเขตและแหล่งข้อมูล',
+          '<div style="font-size:10px;line-height:1.85;color:#34463C">'
+          + '<div>เลขที่รายงาน <b style="color:#11241C">'+esc(docNo)+'</b></div>'
+          + '<div>ช่วงข้อมูล <b style="color:#11241C">'+esc(period)+'</b></div>'
+          + '<div>วันที่มีข้อมูลในช่วง <b style="color:#11241C">'+fmt(PQ.have)+' วัน</b>'
+          +   (PQ.blank || PQ.missing ? ' · ขาด/ยังไม่คีย์ <b style="color:#C42A46">'+fmt(PQ.blank+PQ.missing)+' วัน</b>' : ' · ครบถ้วน')+'</div>'
+          + '<div>ตัวกรองที่ใช้ <b style="color:#11241C">'
+          +   esc((STATE.filter.dayType && STATE.filter.dayType !== 'all' ? (DAYTYPE_TH[STATE.filter.dayType]||STATE.filter.dayType) : 'ทุกประเภทวัน')
+               + ' · ' + (STATE.filter.floor && STATE.filter.floor !== 'all' ? STATE.filter.floor : 'ทุกชั้น'))+'</b></div>'
+          + '<div>แหล่งข้อมูล ไฟล์รายงานยอดประจำวันใน Google Drive ('+fmt((DATA.files||[]).length)+' ไฟล์)</div>'
+          + '<div>ออกรายงานเมื่อ '+esc(thDate(isoOf(new Date()),'long'))+' เวลา '
+          +   esc(String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0'))+' น.</div>'
+          + '</div>')
+    + '</div>'
+    + '<div style="margin-top:16px">'
+    +   a4Box('การรับรองรายงาน',
+          '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'
+          + sign('ผู้จัดทำ') + sign('ผู้ตรวจสอบ') + sign('ผู้อนุมัติ')
+          + '</div>')
+    + '</div>', 5);
+
+  /* เลขหน้าแบบ "หน้า x / ทั้งหมด" และเลขที่รายงาน — แทนค่าตอนท้าย
+     เพราะตอนสร้างแต่ละหน้ายังไม่รู้จำนวนหน้าทั้งหมด */
+  var pages = [p1, p2, p3, p4, p5];
+  return pages.map(function(pg){
+    return pg.split('{{TOTAL}}').join(String(pages.length)).split('{{DOCNO}}').join(esc(docNo));
+  });
 }
 
 function a4Page(title, period, body, pageNo){
@@ -8986,7 +9420,7 @@ function a4Page(title, period, body, pageNo){
     +   '</div>'
     +   '<div style="text-align:right;font-size:9.5px;color:#8A9A90;line-height:1.65;flex:0 0 auto">'
     +     'ออกรายงาน '+esc(thDate(isoOf(new Date()),'medium'))+'<br>'
-    +     'SBK Analytics Suite v'+APP_VERSION+'<br>หน้า '+pageNo+'</div>'
+    +     'เลขที่ {{DOCNO}}<br>SBK Analytics Suite v'+APP_VERSION+' · หน้า '+pageNo+' / {{TOTAL}}</div>'
     + '</div>'
     + '<div style="height:3.5px;border-radius:99px;margin-bottom:14px;'
     +   'background:linear-gradient(90deg,#008960,#EBB400 34%,#FFF5D8 55%,#E94560 78%,#3E2F5B)"></div>'
@@ -8994,7 +9428,7 @@ function a4Page(title, period, body, pageNo){
     + '<div style="position:absolute;left:30px;right:30px;bottom:12px;display:flex;justify-content:space-between;'
     +   'font-size:9px;color:#8A9A90;border-top:1px solid #F5E0D6;padding-top:6px">'
     +   '<span>เอกสารนี้สร้างอัตโนมัติจากข้อมูลในระบบ · ตัวเลขทั้งหมดอ้างอิงไฟล์ต้นทางใน Google Drive</span>'
-    +   '<span>หน้า '+pageNo+' · ศูนย์การค้าซีคอนบางแค</span></div>'
+    +   '<span>หน้า '+pageNo+' / {{TOTAL}} · ศูนย์การค้าซีคอนบางแค</span></div>'
     + '</div>';
 }
 
@@ -9973,6 +10407,8 @@ function initShell(){
      เพราะถ้ารอ แล้วไฟล์ไม่มี จะหน่วงการเปิดแอปไปอีก 3 วินาทีโดยไม่จำเป็น */
   setupIcons();
 
+  initSecNav();
+
   /* เดินนาฬิกาตั้งแต่วินาทีแรก ก่อนหน้าอินโทรจะจางหาย
      ถ้าเริ่มทีหลัง ผู้ใช้จะเห็น "--:--" ค้างอยู่บนหน้าอินโทรตลอด 3 วินาที */
   startClock();
@@ -10197,6 +10633,79 @@ function renderCurrent(){
       + '</div></div>');
     toast('แสดงผลหน้านี้ไม่สำเร็จ: '+e.message,'err');
   }
+  try{ updateSecNav(); }catch(e){}
+}
+
+/* ---------------------------------------------------------------------------
+   (v4.2) เลื่อนดูทีละส่วนให้เห็นครบ
+   ปัญหาที่ผู้ใช้เจอ: เลื่อนเมาส์แล้วหยุดกลางการ์ด เห็นกราฟแท่งแค่ครึ่งบน
+   ต้องเลื่อนต่ออีกรอบถึงเห็นแกนและตัวเลขด้านล่าง
+   แก้ 3 ชั้น:
+     1) scroll-snap แบบ proximity (CSS) — เลื่อนมาใกล้หัวการ์ดแล้วปล่อย จะชิดหัวการ์ดพอดี
+        ใช้ proximity ไม่ใช่ mandatory เพื่อไม่ให้ดึงหน้ากลับตอนตั้งใจหยุดกลางตารางยาว
+     2) ความสูงกราฟไม่เกินความสูงจอ — การ์ดกราฟหนึ่งใบต้องอยู่ในจอเดียวได้เสมอ
+     3) ปุ่ม ▲▼ มุมขวาล่าง กระโดดไปการ์ดก่อน/ถัดไป โดยวางหัวการ์ดใต้แถบหัวพอดี
+--------------------------------------------------------------------------- */
+function secOffset(){
+  var tb = document.querySelector('.topbar');
+  return (tb ? tb.getBoundingClientRect().height : 0) + 12;
+}
+function sectionTops(){
+  var v = document.querySelector('.view.on'); if(!v) return [];
+  var y = window.scrollY || window.pageYOffset || 0, out = [];
+  /* ใช้ลูกชั้นแรกของหน้า = "หนึ่งส่วน" (การ์ด / แถวการ์ด)
+     ส่วนที่ซ่อนอยู่ (สูง 0) ข้ามไป ไม่งั้นกดแล้วเหมือนปุ่มไม่ทำงาน */
+  Array.prototype.forEach.call(v.children, function(el){
+    if(el.offsetHeight > 0) out.push(Math.round(el.getBoundingClientRect().top + y));
+  });
+  var gt = $('groupTabs'); if(gt && gt.offsetHeight > 0) out.unshift(Math.round(gt.getBoundingClientRect().top + y));
+  return out;
+}
+function goSection(dir){
+  var off = secOffset(), y = window.scrollY || 0, tops = sectionTops(), target = null, i;
+  if(dir > 0){
+    for(i=0;i<tops.length;i++){ if(tops[i] - off > y + 4){ target = tops[i] - off; break; } }
+    if(target === null) target = document.documentElement.scrollHeight;   // ส่วนสุดท้ายแล้ว → ท้ายหน้า
+  } else {
+    for(i=tops.length-1;i>=0;i--){ if(tops[i] - off < y - 4){ target = tops[i] - off; break; } }
+    if(target === null) target = 0;
+  }
+  window.scrollTo({ top:Math.max(0, target), behavior:'smooth' });
+}
+function updateSecNav(){
+  var nav = $('secNav'); if(!nav) return;
+  var long = document.documentElement.scrollHeight > window.innerHeight + 160;
+  nav.classList.toggle('on', long && !!DATA.days.length);
+  var y = window.scrollY || 0;
+  var up = $('secPrev'), dn = $('secNext');
+  if(up) up.disabled = y < 8;
+  if(dn) dn.disabled = y + window.innerHeight >= document.documentElement.scrollHeight - 8;
+}
+function initSecNav(){
+  if($('secNav')) return;
+  var nav = document.createElement('div');
+  nav.id = 'secNav'; nav.className = 'secnav no-print';
+  nav.setAttribute('role', 'group'); nav.setAttribute('aria-label', 'เลื่อนดูทีละส่วน');
+  nav.innerHTML =
+      '<button type="button" id="secPrev" title="ส่วนก่อนหน้า (Shift + ↑)" aria-label="ส่วนก่อนหน้า">'
+    +   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>'
+    + '<button type="button" id="secNext" title="ส่วนถัดไป (Shift + ↓)" aria-label="ส่วนถัดไป">'
+    +   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>';
+  document.body.appendChild(nav);
+  $('secPrev').onclick = function(){ goSection(-1); };
+  $('secNext').onclick = function(){ goSection(1); };
+  var tick = null;
+  function soon(){ if(tick) return; tick = setTimeout(function(){ tick = null; updateSecNav(); }, 120); }
+  window.addEventListener('scroll', soon, { passive:true });
+  window.addEventListener('resize', soon);
+  /* Shift + ↑/↓ กระโดดทีละส่วน — ไม่ชนกับการเลื่อนปกติของลูกศรเปล่า
+     และไม่ทำงานขณะพิมพ์ในช่องกรอก */
+  document.addEventListener('keydown', function(e){
+    if(!e.shiftKey || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
+    var t = e.target; if(t && t.matches && t.matches('input,select,textarea')) return;
+    if(LOCKED) return;
+    e.preventDefault(); goSection(e.key === 'ArrowDown' ? 1 : -1);
+  });
 }
 
 /* วาดใหม่ทุกหน้าที่เคยเปิด — เรียกหลังโหลดข้อมูลหรือเปลี่ยนตัวกรอง
