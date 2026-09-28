@@ -676,6 +676,139 @@ html.dark #splash .sp-bg{ opacity:.34 }
     animation:none; opacity:1; transform:none }
 }
 
+/* ---------------- นาฬิกา วัน/เดือน/ปี : เวลา (v3.8) ----------------
+   ใช้ซ้ำสองที่: บนหน้าอินโทร/ม่านพักหน้าจอ (ใหญ่) และแถบใต้หัวหน้าจอ (เล็ก)
+
+   ทำไมต้องกำหนด font-variant-numeric:tabular-nums
+     ฟอนต์ Sarabun ตัวเลขแต่ละตัวกว้างไม่เท่ากัน ถ้าไม่บังคับให้กว้างเท่ากัน
+     ตัวนาฬิกาจะขยับซ้าย-ขวาทุกวินาที ดูเหมือนตัวหนังสือสั่น
+
+   ทำไมตัวเลขต้องมี min-width เป็นหน่วย ch
+     tabular-nums ช่วยได้เฉพาะภายในฟอนต์เดียวกัน แต่เลข "1" กับ "8" ในบางเครื่อง
+     ยังตกไป fallback font จึงกันความกว้างไว้อีกชั้น */
+.clk-num{ font-variant-numeric:tabular-nums; font-feature-settings:'tnum' 1 }
+
+/* ตัวเลขไล่สีแบบเคลื่อนไหว — ไล่สีตามพาเลตของแอป ไม่ใช่สีรุ้งลอย ๆ
+   background-clip:text ต้องมี -webkit- ด้วย ไม่งั้น Safari/iOS ไม่ตัดพื้นหลังให้
+   และต้องมี color เป็น transparent ควบคู่เสมอ */
+.clk-grad{
+  background:linear-gradient(100deg,
+    var(--c-emerald) 0%, var(--c-gold) 26%, var(--c-rose) 52%,
+    var(--c-royal) 74%, var(--c-emerald) 100%);
+  background-size:280% 100%;
+  -webkit-background-clip:text; background-clip:text;
+  -webkit-text-fill-color:transparent; color:transparent;
+  animation:clkFlow 9s linear infinite;
+}
+@keyframes clkFlow{ to{ background-position:280% 50% } }
+
+/* จุดคั่นกะพริบ — กะพริบแบบจางเข้าจางออก ไม่ใช่ตัดหายวับ ซึ่งสะดุดตาเกินไป
+   บนจอที่เปิดค้างทั้งวัน การกะพริบแรง ๆ กวนสายตาคนทำงาน */
+.clk-sep{ animation:clkBlink 1s steps(1,end) infinite; font-style:normal }
+/* (v3.9) จุดคั่นที่อยู่ในตัวเลขไล่สีต้องมีสีของตัวเอง — Chrome/Safari แยกชั้นวาด
+   ให้ element ที่มี animation ทำให้ background-clip:text ของตัวแม่ไม่ทะลุลงมา
+   จุดคั่นจึงโปร่งใสหายไปทั้งตัว (เห็นเป็น "07 19 04" ในภาพทดสอบ) */
+.clk-grad .clk-sep{ -webkit-text-fill-color:var(--c-gold); color:var(--c-gold) }
+@keyframes clkBlink{ 0%,55%{ opacity:1 } 56%,100%{ opacity:.4 } }
+
+/* ---- บนหน้าอินโทร / ม่านพักหน้าจอ ---- */
+#splash .sp-clock{
+  margin:18px auto 2px; line-height:1.25;
+  animation:spUp .7s .32s cubic-bezier(.2,.8,.3,1) both;
+}
+#splash .sp-date{
+  font-size:clamp(12.5px,3.4vw,14.5px); font-weight:700; color:var(--muted);
+  letter-spacing:.01em;
+}
+#splash .sp-time{
+  font-family:'IBM Plex Sans Thai Looped','Sarabun',sans-serif;
+  font-size:clamp(38px,12vw,60px); font-weight:800; letter-spacing:-.02em;
+  margin-top:2px;
+}
+#splash .sp-time .sp-sec{ font-size:.48em; font-weight:700; margin-left:.16em;
+                          vertical-align:.45em; opacity:.85;
+                          /* (v3.9) ตัวที่ยกขึ้นด้วย vertical-align หลุดจากการตัดสีของตัวแม่
+                             ในบางเบราว์เซอร์ → วินาทีโปร่งใสหายไป จึงกำหนดสีของตัวเอง */
+                          -webkit-text-fill-color:var(--c-rose); color:var(--c-rose) }
+#splash .sp-time .sp-unit{ font-size:.3em; font-weight:700; margin-left:.3em;
+                           vertical-align:.7em; color:var(--muted);
+                           -webkit-text-fill-color:currentColor }
+
+/* โหมดม่านพักหน้าจอ: นาฬิกาคือพระเอก จึงขยายและดันชื่อระบบให้เล็กลง
+   (จอที่เปิดค้างในพื้นที่ทำงานจะกลายเป็นนาฬิกาประดับแทนที่จะเป็นจอดำ) */
+#splash.locked .sp-time{ font-size:clamp(46px,16vw,86px) }
+#splash.locked .sp-date{ font-size:clamp(13px,4vw,17px); color:var(--text) }
+#splash.locked .sp-clock{ margin-top:22px }
+#splash.locked .sp-sub{ display:none }
+
+/* ---- นาฬิกาบนแถบหัวหน้าจอ (v3.9 · ย้ายขึ้นมาจากแถวแยกตามที่ผู้ใช้ขอ) ----
+   ความยากคือแถบหัวมีของเต็มอยู่แล้ว จึงปรับรูปแบบตามความกว้างจอ 3 ระดับ
+   ไม่ใช่ย่อทั้งก้อนแบบเดียว:
+     ≥1500px   กล่องเต็ม: นาฬิกาเข็ม + วันที่เต็ม + คำทักทาย + เวลา
+     768–1499  กล่องย่อ: นาฬิกาเข็ม + วันที่ย่อ + เวลา
+     <768      ไม่มีกล่อง — ย้ายไปแทนบรรทัดคำอธิบายใต้ชื่อหน้า
+   ทุกระดับวัดแล้วว่าชื่อหน้ายังเหลือที่ และหน้าไม่ล้นแนวนอน */
+.hclock{
+  display:none; align-items:center; gap:10px; flex:0 0 auto;
+  padding:5px 14px 5px 7px; border-radius:16px; line-height:1.25;
+  border:1.5px solid transparent;
+  /* ขอบไล่สีเคลื่อนไหว: ชั้นในทึบ (padding-box) ชั้นนอกไล่สี (border-box)
+     ได้ขอบไล่สีที่มุมโค้งตามกล่องโดยไม่ต้องใช้ pseudo-element ซ้อน */
+  background:
+    linear-gradient(var(--surface),var(--surface)) padding-box,
+    linear-gradient(100deg,var(--c-emerald),var(--c-gold) 30%,var(--c-rose) 60%,var(--c-royal) 85%,var(--c-emerald)) border-box;
+  background-size:100% 100%, 300% 100%;
+  animation:hcRing 10s linear infinite;
+  box-shadow:0 10px 24px -18px rgba(15,10,35,.7);
+}
+@keyframes hcRing{ to{ background-position:0 0, 300% 0 } }
+.hclock .hc-face{ width:34px; height:34px; flex:0 0 34px; display:block }
+.hclock .hc-txt{ display:flex; flex-direction:column; min-width:0 }
+.hclock .hc-date{ font-size:11px; font-weight:700; color:var(--muted); white-space:nowrap }
+.hclock .hc-full, .hclock .hc-tag{ display:none }
+.hclock .hc-tag{ color:var(--faint); font-weight:600 }
+.hclock .hc-time{ font-size:18px; font-weight:800; letter-spacing:-.01em; white-space:nowrap }
+.hclock .hc-time .sp-unit{ font-size:.62em; font-weight:700; color:var(--muted);
+                           -webkit-text-fill-color:currentColor; margin-left:.28em }
+/* เข็มนาฬิกาหมุนด้วย transform ที่ JS ตั้งทุกวินาที
+   transform-origin ต้องเป็นจุดศูนย์กลางหน้าปัด ไม่งั้นเข็มจะหมุนรอบมุมซ้ายบน */
+.hclock .hc-face line{ transform-origin:17px 17px; transform-box:view-box }
+.hclock .hc-face .hc-s{ transition:transform .25s cubic-bezier(.4,2.2,.6,1) }
+
+/* บรรทัดนาฬิกาบนมือถือ (แทนคำอธิบายใต้ชื่อหน้า) */
+.hc-mini{ display:none; font-size:11.5px; font-weight:700; color:var(--muted);
+          white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.hc-mini .clk-grad{ font-weight:800; font-size:12.5px }
+/* จอแคบกว่า 430px ตัดวินาทีทิ้ง — ไม่งั้นเวลาถูกตัดด้วย … ครึ่งตัวเลข ซึ่งอ่านผิดง่ายกว่าไม่มีวินาที */
+@media (max-width:429.98px){ .hc-mini .m-sec{ display:none } }
+
+@media (min-width:768px){ .hclock{ display:flex } }
+@media (min-width:1500px){
+  .hclock .hc-full{ display:inline }
+  .hclock .hc-short{ display:none }
+  .hclock .hc-tag{ display:inline }
+  .hclock .hc-time{ font-size:19px }
+}
+@media (max-width:767.98px){
+  #pageSub{ display:none }
+  .hc-mini{ display:block }
+}
+/* ช่องสถานะข้อมูลกินที่ถึง ~230px — จอกลางย่อเหลือจุดสีพร้อมคำอธิบายเมื่อชี้
+   (ข้อความเต็มยังอยู่ที่ท้ายแถบข้าง แถบบริบท และ toast ทุกครั้งที่สถานะเปลี่ยน) */
+@media (max-width:1279.98px){
+  #statusText{ display:none }
+  #statusChip{ padding:9px 10px }
+}
+
+/* เคารพการตั้งค่า "ลดการเคลื่อนไหว" ของระบบปฏิบัติการ
+   ผู้ใช้บางคนเวียนหัวกับภาพเคลื่อนไหว และการไล่สีวิ่งทั้งวันคือตัวการอันดับต้น ๆ */
+@media (prefers-reduced-motion:reduce){
+  .clk-grad, .clk-sep, .hclock{ animation:none }
+  .hclock .hc-face .hc-s{ transition:none }
+  .clk-grad{ background:none; -webkit-text-fill-color:currentColor; color:var(--accent) }
+  #splash .sp-clock{ animation:none; opacity:1; transform:none }
+}
+
 /* ---------------- รายงาน A4 แนวนอน ----------------
    1123×794 px @96dpi = ขนาด A4 แนวนอนพอดี
    สร้างเป็น container ขนาดคงที่นอกจอ เพื่อให้ภาพที่ export ออกมาคมและไม่เพี้ยนตามขนาดหน้าจอ */
@@ -1050,6 +1183,17 @@ html{ -webkit-text-size-adjust:100%; text-size-adjust:100% }
   .content-wrap{ max-width:1720px; margin-inline:auto; width:100% }
 }
 
+/* ---- 10ก. แท็บย่อยของเมนูที่ยุบรวม (v3.6) ----
+   วางชิดบนสุดของเนื้อหา ใช้ .seg ชุดเดียวกับตัวสลับโหมดอื่นในแอป
+   จึงไม่เพิ่มภาษาภาพใหม่ให้ผู้ใช้ต้องเรียนรู้ */
+#groupTabs{ margin-bottom:2px }
+#groupTabs .seg{ width:fit-content; max-width:100% }
+#groupTabs .seg button{ font-size:13px; padding-inline:15px }
+@media (max-width:560px){
+  #groupTabs .seg{ width:100% }
+  #groupTabs .seg button{ flex:1; padding-inline:8px; font-size:12px }
+}
+
 /* ---- 10ข. ตัวชี้โฟกัสกลาง (v3.5) ----
    เดิม .inp{outline:none} ทิ้ง ring ของเบราว์เซอร์แล้วแทนด้วยเงาความทึบ 20%
    ซึ่งคอนทราสต์ต่ำกว่าเกณฑ์ WCAG 2.4.11 มาก และปุ่มบนพื้นเขียว/ทองเข้ม
@@ -1098,6 +1242,17 @@ table.tbl th[aria-sort="descending"]::after{ content:'\25BC'; opacity:1; color:v
     </div>
     <div class="sp-name">SBK Analytics Suite</div>
     <div class="sp-sub">ระบบวิเคราะห์ยอดเข้า–ออกศูนย์การค้า</div>
+
+    <!-- นาฬิกา วัน/เดือน/ปี : เวลา (v3.8)
+         aria-hidden เพราะ screen reader ไม่ควรถูกอ่านเวลาใหม่ทุกวินาที
+         ผู้ใช้ screen reader มีนาฬิกาของระบบปฏิบัติการอยู่แล้ว -->
+    <div class="sp-clock" id="spClock" aria-hidden="true">
+      <div class="sp-date clk-num" id="spDate">—</div>
+      <div class="sp-time clk-num clk-grad">
+        <span id="spHH">--</span><i class="clk-sep">:</i><span id="spMM">--</span><span class="sp-sec" id="spSS">--</span><span class="sp-unit">น.</span>
+      </div>
+    </div>
+
     <div class="sp-bar"><span></span></div>
     <div class="sp-foot">
       <img id="splashLogo" alt="Seacon Bangkae">
@@ -1125,65 +1280,47 @@ table.tbl th[aria-sort="descending"]::after{ content:'\25BC'; opacity:1; color:v
 
   <nav class="flex-1 overflow-y-auto pb-3" id="sideNav">
     <div class="nav-sec">ภาพรวม</div>
-    <button type="button" class="nav-item active" data-view="overview">
+    <button type="button" class="nav-item active" data-group="overview" data-view="overview">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
       แดชบอร์ดภาพรวม
     </button>
 
     <div class="nav-sec">การวิเคราะห์</div>
-    <button type="button" class="nav-item" data-view="gates">
+    <button type="button" class="nav-item" data-group="gates" data-view="gates">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-6h6v6"/></svg>
       รายประตู<span class="nav-badge" id="nb-gates"></span>
     </button>
-    <button type="button" class="nav-item" data-view="intensity">
+    <button type="button" class="nav-item" data-group="hourly" data-view="hourly">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3 0 3-8 6-8s3 10 6 10 3-6 6-6"/><path d="M3 21h18"/></svg>
-      ความหนาแน่นรายชั่วโมง
+      รายชั่วโมง &amp; ความหนาแน่น
     </button>
-    <button type="button" class="nav-item" data-view="gtrend">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg>
-      แนวโน้มรายประตู
-    </button>
-    <button type="button" class="nav-item" data-view="hourly">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-      ยอดรายชั่วโมง
-    </button>
-    <button type="button" class="nav-item" data-view="vehicles">
+    <button type="button" class="nav-item" data-group="vehicles" data-view="vehicles">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14M6 17l-1.5-5L6 7h12l1.5 5L18 17"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/></svg>
       ยานพาหนะทุกประเภท
     </button>
-    <button type="button" class="nav-item" data-view="monthly">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="7"/><rect x="12" y="8" width="3" height="11"/><rect x="17" y="5" width="3" height="14"/></svg>
-      รายเดือน / รายปี
-    </button>
-    <button type="button" class="nav-item" data-view="compare">
+    <button type="button" class="nav-item" data-group="compare" data-view="compare">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M8 21H3v-5M21 3l-7 7M3 21l7-7"/></svg>
-      เทียบช่วงเวลา
+      เปรียบเทียบหลายมิติ
     </button>
-    <button type="button" class="nav-item" data-view="forecast">
+    <button type="button" class="nav-item" data-group="forecast" data-view="forecast">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15l5-5 4 4 4-6 5 5"/><path d="M3 21h18"/><circle cx="20" cy="6" r="2"/></svg>
       พยากรณ์ &amp; ผิดปกติ
-      <span class="nav-badge text-white g-rose">ใหม่</span>
     </button>
-    <button type="button" class="nav-item" data-view="daily">
+    <button type="button" class="nav-item" data-group="daily" data-view="daily">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
       ตารางรายวัน
     </button>
 
     <div class="nav-sec">รายงาน &amp; ระบบ</div>
-    <button type="button" class="nav-item" data-view="report">
+    <button type="button" class="nav-item" data-group="report" data-view="report">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
-      รายงาน A4
+      รายงาน &amp; Infographic
     </button>
-    <button type="button" class="nav-item" data-view="infographic">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 16v-4M12 16V8M17 16v-6"/></svg>
-      Infographic
-      <span class="nav-badge text-white g-orange">ใหม่</span>
-    </button>
-    <button type="button" class="nav-item" data-view="quality">
+    <button type="button" class="nav-item" data-group="quality" data-view="quality">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       คุณภาพข้อมูล<span class="nav-badge" id="nb-quality"></span>
     </button>
-    <button type="button" class="nav-item" data-view="settings">
+    <button type="button" class="nav-item" data-group="settings" data-view="settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.09A1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       ตั้งค่า &amp; ไฟล์ข้อมูล
     </button>
@@ -1210,6 +1347,35 @@ table.tbl th[aria-sort="descending"]::after{ content:'\25BC'; opacity:1; color:v
     <div class="min-w-0 flex-1">
       <h1 class="text-[17px] md:text-[19px] font-extrabold truncate" id="pageTitle">แดชบอร์ดภาพรวม</h1>
       <p class="text-[11.5px] truncate" style="color:var(--muted)" id="pageSub">สรุปยอดลูกค้าและยานพาหนะเข้า–ออกศูนย์การค้า</p>
+      <!-- นาฬิกาบนมือถือ: แทนบรรทัดคำอธิบาย เพราะแถบหัวไม่มีที่ว่างให้กล่องนาฬิกา -->
+      <p class="hc-mini clk-num" id="hcMini" aria-hidden="true"><span id="mDate">—</span> · <span class="clk-grad"><span id="mHH">--</span><i class="clk-sep">:</i><span id="mMM">--</span><span class="m-sec"><i class="clk-sep">:</i><span id="mSS">--</span> น.</span></span></p>
+    </div>
+
+    <!-- นาฬิกา วัน/เดือน/ปี : เวลา บนแถบหัว (v3.9)
+         aria-hidden: screen reader ไม่ควรถูกอ่านเวลาใหม่ทุกวินาที -->
+    <div class="hclock no-print" id="hClock" aria-hidden="true">
+      <svg class="hc-face" viewBox="0 0 34 34">
+        <defs>
+          <linearGradient id="hcG" x1="0" y1="0" x2="1" y2="1">
+            <!-- ต้องใส่สีผ่าน style ไม่ใช่ attribute: attribute ของ SVG อ่านตัวแปร CSS ไม่ได้ -->
+            <stop offset="0" style="stop-color:var(--c-emerald)"/><stop offset=".55" style="stop-color:var(--c-gold)"/><stop offset="1" style="stop-color:var(--c-rose)"/>
+          </linearGradient>
+        </defs>
+        <circle cx="17" cy="17" r="15.5" fill="url(#hcG)"/>
+        <circle cx="17" cy="17" r="12.6" style="fill:var(--surface)"/>
+        <g stroke-width="1.3" stroke-linecap="round" opacity=".55" style="stroke:var(--muted)">
+          <line x1="17" y1="6" x2="17" y2="7.8"/><line x1="28" y1="17" x2="26.2" y2="17"/>
+          <line x1="17" y1="28" x2="17" y2="26.2"/><line x1="6" y1="17" x2="7.8" y2="17"/>
+        </g>
+        <line class="hc-h" id="hcH" x1="17" y1="17" x2="17" y2="10.6" stroke-width="2.4" stroke-linecap="round" style="stroke:var(--text)"/>
+        <line class="hc-m" id="hcM" x1="17" y1="17" x2="17" y2="7.6" stroke-width="1.7" stroke-linecap="round" style="stroke:var(--text)"/>
+        <line class="hc-s" id="hcS" x1="17" y1="19.5" x2="17" y2="6.6" stroke-width="1" stroke-linecap="round" style="stroke:var(--c-rose)"/>
+        <circle cx="17" cy="17" r="1.8" style="fill:var(--c-rose)"/>
+      </svg>
+      <span class="hc-txt">
+        <span class="hc-date clk-num"><span class="hc-full" id="lvDate">—</span><span class="hc-short" id="lvDateS">—</span><span class="hc-tag"> · <span id="lvTag"></span></span></span>
+        <span class="hc-time clk-num clk-grad"><span id="lvHH">--</span><i class="clk-sep">:</i><span id="lvMM">--</span><i class="clk-sep">:</i><span id="lvSS">--</span><span class="sp-unit">น.</span></span>
+      </span>
     </div>
 
     <div class="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11.5px] font-semibold"
@@ -1331,6 +1497,9 @@ table.tbl th[aria-sort="descending"]::after{ content:'\25BC'; opacity:1; color:v
       </div>
     </div>
 
+    <!-- แท็บย่อยของเมนูที่ยุบรวมกัน (v3.6) — อยู่นอก .view เพื่อไม่ให้หายตอนหน้าวาดตัวเองใหม่ -->
+    <div id="groupTabs" class="hidden"></div>
+
     <div class="view" id="v-overview"></div>
     <div class="view" id="v-gates"></div>
     <div class="view" id="v-gtrend"></div>
@@ -1339,6 +1508,7 @@ table.tbl th[aria-sort="descending"]::after{ content:'\25BC'; opacity:1; color:v
     <div class="view" id="v-vehicles"></div>
     <div class="view" id="v-monthly"></div>
     <div class="view" id="v-compare"></div>
+    <div class="view" id="v-stats"></div>
     <div class="view" id="v-forecast"></div>
     <div class="view" id="v-daily"></div>
     <div class="view" id="v-report"></div>
@@ -1358,7 +1528,7 @@ table.tbl th[aria-sort="descending"]::after{ content:'\25BC'; opacity:1; color:v
    ส่วนที่ 1 · ค่าคงที่ และเครื่องมือพื้นฐาน
 ============================================================================ */
 
-var APP_VERSION = '3.5';
+var APP_VERSION = '3.9';
 
 /* โลโก้ Seacon Bangkae ฝังเป็น data URL — ไฟล์เดียวจบ ไม่ต้องแนบรูปแยก
    มี 2 ชุด: ชุดสีเดิมสำหรับพื้นสว่าง/รายงาน และชุดตัวอักษรสีขาวสำหรับพื้นมืด */
@@ -1529,6 +1699,95 @@ function median(arr){
   return a.length%2 ? a[m] : (a[m-1]+a[m])/2;
 }
 function zeros(n){ var a=new Array(n); for(var i=0;i<n;i++)a[i]=0; return a; }
+
+/* ============================================================================
+   สถิติเชิงลึก (v3.7) — ใช้ในหน้า "วิเคราะห์สถิติเชิงลึก"
+   ทุกฟังก์ชันคืน null เมื่อข้อมูลไม่พอคำนวณ ไม่คืน NaN
+   เพราะ NaN จะไหลต่อไปทั้งหน้าแล้วโผล่เป็น "NaN" บนจอโดยไม่มีอะไรเตือน
+============================================================================ */
+
+/* ส่วนเบี่ยงเบนมาตรฐานแบบ "ตัวอย่าง" (หาร n−1)
+   ทำไมไม่หาร n: ชุดวันที่ผู้ใช้เลือกเป็นตัวอย่างของพฤติกรรมลูกค้า ไม่ใช่ประชากรทั้งหมด
+   (เดือนหน้าก็ยังมีวันใหม่เข้ามาอีก) การหาร n−1 จึงเป็นค่าประมาณที่ไม่เอนเอียง
+   ต้องมีอย่างน้อย 2 วันถึงจะคำนวณได้ — วันเดียวไม่มี "ความผันผวน" ให้วัด */
+function stdev(arr){
+  var a = arr.filter(Number.isFinite);
+  if(a.length < 2) return null;
+  var m = sum(a) / a.length, ss = 0;
+  for(var i=0;i<a.length;i++){ var d = a[i] - m; ss += d*d; }
+  return Math.sqrt(ss / (a.length - 1));
+}
+
+/* สัมประสิทธิ์การแปรผัน = SD ÷ ค่าเฉลี่ย (เป็น %)
+   จำเป็นเพราะ SD ของลูกค้า (หลักพัน) กับของรถ (หลักร้อย) เอามาเทียบกันตรง ๆ ไม่ได้
+   CV เป็นค่าไม่มีหน่วย จึงบอกได้ว่า "อะไรผันผวนกว่ากัน" ได้จริง
+   ค่าเฉลี่ยเป็น 0 หรือติดลบ -> CV ไม่มีความหมาย คืน null */
+function coefVar(arr){
+  var a = arr.filter(Number.isFinite);
+  var sd = stdev(a);
+  if(sd === null) return null;
+  var m = sum(a) / a.length;
+  if(!(m > 0)) return null;
+  return sd / m * 100;
+}
+
+/* สัมประสิทธิ์สหสัมพันธ์ของเพียร์สัน (r) ระหว่างข้อมูลสองชุดที่จับคู่กันรายวัน
+   ต้องจับคู่ "วันเดียวกัน" เท่านั้น ถ้าเอายอดลูกค้าของวันหนึ่งไปจับกับยอดรถอีกวัน
+   ค่าที่ได้ไม่มีความหมายใด ๆ เลย
+   คืน null เมื่อ: ข้อมูลน้อยกว่า 3 คู่ (r จาก 2 จุดเป็น ±1 เสมอ ไม่ได้บอกอะไร)
+                 หรือชุดใดชุดหนึ่งไม่มีความแปรปรวนเลย (ตัวส่วนเป็น 0) */
+function pearson(xs, ys){
+  var n = Math.min(xs.length, ys.length);
+  var x = [], y = [];
+  for(var i=0;i<n;i++){
+    if(Number.isFinite(xs[i]) && Number.isFinite(ys[i])){ x.push(xs[i]); y.push(ys[i]); }
+  }
+  if(x.length < 3) return null;
+  var mx = sum(x)/x.length, my = sum(y)/y.length;
+  var sxy = 0, sxx = 0, syy = 0;
+  for(var k=0;k<x.length;k++){
+    var dx = x[k]-mx, dy = y[k]-my;
+    sxy += dx*dy; sxx += dx*dx; syy += dy*dy;
+  }
+  var den = Math.sqrt(sxx*syy);
+  if(!(den > 0)) return null;
+  /* ปัดเศษทศนิยมลอยตัวอาจทำให้ได้ 1.0000000002 ซึ่งเป็นค่าที่เป็นไปไม่ได้ */
+  return clamp(sxy/den, -1, 1);
+}
+
+/* แปลค่า r เป็นภาษาที่เอาไปใช้ตัดสินใจได้ พร้อมสีสถานะ
+   เกณฑ์นี้เป็นเกณฑ์ที่ใช้กันทั่วไปในงานสถิติประยุกต์ ไม่ใช่กฎตายตัว */
+function corrLabel(r){
+  if(r === null) return { text:'คำนวณไม่ได้', tone:'0' };
+  var a = Math.abs(r);
+  var t = a >= 0.9 ? 'สูงมาก' : a >= 0.7 ? 'สูง' : a >= 0.5 ? 'ปานกลาง'
+        : a >= 0.3 ? 'ค่อนข้างต่ำ' : 'ต่ำ';
+  return { text: t + (r < 0 ? ' (ทิศทางตรงข้าม)' : ''), tone: a >= 0.7 ? 'up' : (a >= 0.3 ? 'w' : '0') };
+}
+
+/* ชุดสถิติมาตรฐานของตัวเลขชุดหนึ่ง — ใช้ซ้ำทั้งฝั่งลูกค้าและฝั่งรถ
+   รับ rows = [{d:'2026-08-01', v:1234}, ...] เพื่อให้รู้ว่าค่าสูงสุด/ต่ำสุดเกิดวันไหน
+   (ตัวเลขเฉย ๆ โดยไม่รู้วันที่ เอาไปตรวจสอบต่อไม่ได้) */
+function statsOf(rows){
+  var ok = rows.filter(function(r){ return Number.isFinite(r.v); });
+  if(!ok.length){
+    return { n:0, total:0, mean:null, median:null, sd:null, cv:null,
+             max:null, maxDate:null, min:null, minDate:null };
+  }
+  var vals = ok.map(function(r){ return r.v; });
+  var hi = ok[0], lo = ok[0];
+  ok.forEach(function(r){ if(r.v > hi.v) hi = r; if(r.v < lo.v) lo = r; });
+  return {
+    n: ok.length,
+    total: sum(vals),
+    mean: sum(vals)/ok.length,
+    median: median(vals),
+    sd: stdev(vals),
+    cv: coefVar(vals),
+    max: hi.v, maxDate: hi.d,
+    min: lo.v, minDate: lo.d
+  };
+}
 function clamp(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); }
 
 /* ---- วันที่ (ระบบใช้ ISO ภายใน แต่แสดงผลเป็น พ.ศ. เสมอ) ---- */
@@ -1545,7 +1804,13 @@ function isIso(v){ return typeof v==='string' && ISO_RE.test(v); }
 function toDate(iso){
   if(!isIso(iso)) return null;
   var d = new Date(iso+'T00:00:00');
-  return isNaN(d.getTime()) ? null : d;
+  if(isNaN(d.getTime())) return null;
+  /* (v3.9) ต้องตรวจย้อนกลับว่าได้วันเดิมจริง — เดิมเชื่อว่า Date จะคืน Invalid Date
+     ให้วันที่ไม่มีจริง แต่ทดสอบแล้ว '2026-02-31' กลายเป็น 3 มี.ค. และ '2026-09-31'
+     กลายเป็น 1 ต.ค. แบบเงียบ ๆ ทำให้ชื่อวันในสัปดาห์ผิด
+     และวันปลอมนั้นไปทับยอดของวันถัดไปในกราฟ */
+  if(isoOf(d) !== iso) return null;
+  return d;
 }
 /* จันทร์=0 … อาทิตย์=6 — เรียงแบบไทย ไม่ใช่ getDay() ที่เริ่มวันอาทิตย์ */
 function dowOf(iso){ var d=toDate(iso); return d ? (d.getDay()+6)%7 : 0; }
@@ -1619,6 +1884,12 @@ function rangeLabelPair(aFrom,aTo,bFrom,bTo){
 }
 
 function ymOf(iso){ return String(iso).slice(0,7); }
+/* แปลง 'YYYY-MM-DD' ที่ปีเป็น พ.ศ. (> 2400) ให้เป็น ค.ศ. — ปีอื่นคืนค่าเดิม */
+function normIsoYear(iso){
+  var y = parseInt(String(iso).slice(0,4), 10);
+  if(!(y > 2400)) return iso;
+  return String(y - 543) + String(iso).slice(4);
+}
 function addDays(iso,n){ var d=toDate(iso); if(!d) return null; d.setDate(d.getDate()+n); return isoOf(d); }
 function isoOf(d){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -1956,9 +2227,19 @@ var CFG = {
   autoSync: true,                      // ตรวจหาข้อมูลใหม่เบื้องหลังทุกครั้งที่เปิดโปรแกรม
   gateMerge: [],                       // ประตูเปลี่ยนชื่อที่ผู้ใช้จับคู่เพิ่มเอง
   gateMergeOff: [],                    // id ของรายการตั้งต้นที่ผู้ใช้ปิดไว้
-  idleMin: 5,                          // พักหน้าจอเมื่อไม่มีการใช้งานกี่นาที (0 = ไม่พัก)
+  idleMin: 4,                          // พักหน้าจอเมื่อไม่มีการใช้งานกี่นาที (0 = ไม่พัก)
   iconUrl: '',                         // URL เต็มของไอคอนแอป (ใช้เมื่ออัปโหลดไฟล์คู่ HTML ไม่ได้)
-  refreshMin: 0                        // 0 = ไม่รีเฟรชอัตโนมัติ
+  refreshMin: 0,                       // 0 = ไม่รีเฟรชอัตโนมัติ
+
+  /* ---- หน้าความหนาแน่น (v3.6) ----
+     densBase = "ยอดตั้งต้น" ที่ยกมาจากช่วงก่อน 11:00 · null = ให้ระบบคำนวณเอง
+       จากยอดสุทธิของชั่วโมงก่อนหน้า ซึ่งเป็นค่าตั้งต้นที่ถูกต้องในกรณีปกติ
+       แต่บางวันไฟล์ต้นทางไม่มีตารางชั่วโมง 10:00 หรือมีคนค้างจากกะกลางคืน
+       ผู้ใช้จึงต้องกรอกทับได้ · แยกค่าของลูกค้ากับรถ เพราะเป็นคนละหน่วย
+     densZone = เกณฑ์แบ่งโซนสีในกราฟ (คน/คัน) · null = คำนวณจากค่าสูงสุดของช่วงที่เลือก
+       ถ้ารู้ความจุจริงของพื้นที่ ให้กรอกตัวเลขเอง จะอ่านสถานะได้ตรงกับหน้างานกว่า */
+  densBase: { p:null, c:null },
+  densZone: { p:null, c:null }          // { mid:number, high:number } หรือ null
 };
 /* URL ของ deployment รุ่นก่อน ๆ — ถ้าเบราว์เซอร์ยังจำค่าเหล่านี้ไว้ ต้องเปลี่ยนให้เป็น URL ปัจจุบัน
    ไม่งั้นผู้ใช้ที่เคยเปิดไฟล์รุ่นเก่าจะยังยิงไปที่ backend ตัวเดิมโดยไม่รู้ตัว */
@@ -2201,7 +2482,7 @@ var STATE = {
   metric: 'people',          // people | cars
   intensityMode: 'p',        // p = ลูกค้า, c = รถยนต์
   intensityGates: [],        // ประตูที่เลือกดูในหน้าความหนาแน่น
-  compare: { mode:'mom' },   // mom | yoy | custom
+  compare: { mode:'mom', day:'', dayBase:'prev', dayOther:'', dim:'hour' },   // mom | yoy | custom | day
   forecastDays: 14,
   trendGates: [],            // ประตูที่เลือกดูในหน้าแนวโน้มรายประตู
   ovGran: null,              /* ความละเอียดกราฟแนวโน้มหน้าภาพรวม
@@ -2210,6 +2491,10 @@ var STATE = {
   trendGran: 'week',         // day | week | month
   trendDir: 'in',            // in = ลูกค้าเข้า, out = ลูกค้าออก
   monthlyMetric: 'custIn',   // ตัวชี้วัดของหน้ารายเดือน/รายปี
+  /* หน้าวิเคราะห์สถิติเชิงลึก (v3.7) — กลุ่มวันสองกลุ่มที่ผู้ใช้เลือกมาเทียบกันเอง
+     ค่าตั้งต้นคือ จันทร์–ศุกร์ กับ เสาร์–อาทิตย์ ซึ่งเป็นคู่ที่ฝ่ายปฏิบัติการใช้บ่อยที่สุด */
+  statA: 'wd',
+  statB: 'we',
   gateSort: { key:'total', dir:-1 },
   dailySort: { key:'d', dir:-1 },
   charts: {}                 // เก็บ instance ของ Chart.js เพื่อ destroy ก่อนวาดใหม่
@@ -2238,8 +2523,10 @@ function setProgress(show, text, done, total){
   }
 }
 function setStatus(text, kind){
-  var dot=$('statusDot'), t=$('statusText'), f=$('footStat');
+  var dot=$('statusDot'), t=$('statusText'), f=$('footStat'), chip=$('statusChip');
   if(t) t.textContent = text;
+  /* จอกลางซ่อนข้อความเหลือแต่จุดสี จึงต้องมี title/aria-label ไว้บอกสถานะเต็ม */
+  if(chip){ chip.title = text; chip.setAttribute('aria-label', 'สถานะข้อมูล: '+text); }
   if(f) f.textContent = text;
   if(dot) dot.style.background = kind==='ok' ? 'var(--ok)'
                               : kind==='err' ? 'var(--err)'
@@ -2466,10 +2753,27 @@ function buildModel(fileRecs){
      ตารางที่ไม่มี prototype ปิดช่องนี้ทั้งหมดโดยไม่ต้องไล่ตรวจชื่อทีละแบบ */
   var map = Object.create(null);        // iso → day  (กันวันซ้ำ)
   var dupes = [];
+  var invalid = [];                     // (v3.9) วันที่ที่ไม่มีอยู่จริง เช่น 31 ก.ย.
 
   fileRecs.forEach(function(fr){
     (fr.days||[]).forEach(function(d){
       if(!d || typeof d.d!=='string' || !/^\d{4}-\d{2}-\d{2}$/.test(d.d)) return;
+
+      /* (v3.9) ปีเป็น พ.ศ. หลุดมาจากหลังบ้าน (เช่น 2569-09-01) → แปลงเป็น ค.ศ. ก่อน
+         ไม่งั้นทั้งวันจะไปอยู่ปี 3112 หลัง +543 ตอนแสดงผล และหลุดออกนอกทุกตัวกรอง */
+      var iso0 = normIsoYear(d.d);
+      var alt0 = d.dAlt ? normIsoYear(d.dAlt) : null;
+
+      /* (v3.9) วันที่ต้องมีอยู่จริงในปฏิทิน — ชื่อแท็บ "31" ในไฟล์เดือนที่มี 30 วัน
+         เคยผ่านเข้ามาเป็น 2026-09-31 แล้วถูกนับชื่อวันเป็นของ 1 ต.ค.
+         ถ้ามีวันที่สำรองจากชื่อแท็บที่ถูกต้องให้ใช้วันนั้น ไม่งั้นตัดทิ้ง
+         พร้อมแจ้งในหน้าคุณภาพข้อมูล แทนการเดาว่าตั้งใจหมายถึงวันไหน */
+      if(!toDate(iso0)){
+        if(alt0 && toDate(alt0)){ iso0 = alt0; alt0 = null; }
+        else { invalid.push({ date:d.d, sheet:d.sh||'', file:fr.name||'' }); return; }
+      }
+      d.d = iso0;
+      d.dAlt = (alt0 && toDate(alt0)) ? alt0 : null;
 
       var key = d.d;
       var existing = map[key];
@@ -2497,7 +2801,7 @@ function buildModel(fileRecs){
   DATA.days = days;
   DATA.byDate = map;
   DATA.gates = buildGateIndex(days);
-  DATA.issues = analyzeQuality(days, dupes);
+  DATA.issues = analyzeQuality(days, dupes, invalid);
 
   // อัปเดตป้ายจำนวนบนเมนู
   var nbg=$('nb-gates'); if(nbg){ nbg.textContent = DATA.gates.pedIn.length || ''; nbg.className='nav-badge chip-0'; }
@@ -2947,6 +3251,24 @@ var CTX_PRESETS = [
 var DAYTYPE_TH = { wd:'จันทร์–ศุกร์', we:'เสาร์–อาทิตย์', sat:'เฉพาะเสาร์',
                    sun:'เฉพาะอาทิตย์', hol:'วันหยุดนักขัตฤกษ์' };
 
+/* ---- กลุ่มวันสำหรับหน้าวิเคราะห์สถิติเชิงลึก (v3.7) ----
+   ต่างจากตัวกรอง dayType ของทั้งแอปตรงที่ "เลือกได้สองกลุ่มพร้อมกันเพื่อเอามาเทียบกัน"
+   ตัวกรองเดิมเลือกได้ทีละกลุ่ม จึงตอบคำถามอย่าง "วันพุธต่างจากวันเสาร์แค่ไหน" ไม่ได้
+   dow ในระบบนี้ 0 = จันทร์ ... 6 = อาทิตย์ (ดู dowOf ที่ shift จาก getDay ของ JS แล้ว) */
+var STAT_GROUPS = [
+  { k:'all', label:'ทุกวันในช่วงที่เลือก', test:function(){ return true; } },
+  { k:'wd',  label:'จันทร์–ศุกร์ (ไม่รวมวันหยุด)', test:function(d){ return d.dow<=4 && !d.hol; } },
+  { k:'we',  label:'เสาร์–อาทิตย์',        test:function(d){ return d.dow>=5; } },
+  { k:'hol', label:'วันหยุดนักขัตฤกษ์',    test:function(d){ return !!d.hol; } },
+  { k:'nhol',label:'วันธรรมดา (ไม่รวมวันหยุดนักขัตฤกษ์)', test:function(d){ return !d.hol; } }
+].concat(TH_DOW_FULL.map(function(nm, i){
+  return { k:'d'+i, label:'เฉพาะวัน'+nm, test:function(d){ return d.dow === i; } };
+}));
+function statGroupOf(k){
+  for(var i=0;i<STAT_GROUPS.length;i++) if(STAT_GROUPS[i].k === k) return STAT_GROUPS[i];
+  return STAT_GROUPS[0];
+}
+
 function renderCtxBar(){
   var bar = $('ctxBar'); if(!bar) return;
   /* ต้องเช็คสองอย่าง: มีข้อมูลแล้วหรือยัง และหน้าที่เปิดอยู่ใช้ตัวกรองไหม
@@ -3238,8 +3560,16 @@ function gateCoverNote(g, n){
    ทำไมรถต้องมีฐาน: ลานจอดมีรถค้างจากกะกลางคืน/พนักงาน ถ้าเริ่มที่ 0 เหมือนคน
    ค่าความหนาแน่นจะต่ำกว่าความจริงทั้งวัน และอาจติดลบตอนเช้า
 ============================================================================ */
-function densityOfDay(d, mode){
-  var res = { hours: DENS_HOURS.slice(), values: [], base: 0, peak:null, peakHour:null };
+/* opt.base = ยอดตั้งต้นที่ผู้ใช้กรอกเอง (คน/คัน ที่ค้างอยู่ก่อนชั่วโมงแรกของตาราง)
+   ถ้าไม่ส่งมา หรือส่งค่าที่ไม่ใช่ตัวเลข จะคำนวณจากยอดสุทธิของชั่วโมงก่อนหน้าเหมือนเดิม
+
+   res.clamped = รายการชั่วโมงที่ "คำนวณแล้วติดลบ" แล้วถูกปัดขึ้นเป็น 0
+   เดิมปัดเงียบ ๆ ซึ่งซ่อนความผิดพลาดของข้อมูลต้นทางไว้: ยอดออกมากกว่ายอดที่อยู่จริง
+   แปลว่าคีย์ข้อมูลผิด หรือมีประตูที่นับเฉพาะขาออกไม่นับขาเข้า
+   ต้องเก็บไว้รายงานให้ผู้ใช้เห็น ไม่ใช่กลบทิ้ง */
+function densityOfDay(d, mode, opt){
+  var res = { hours: DENS_HOURS.slice(), values: [], base: 0, peak:null, peakHour:null,
+              clamped: [], baseClamped:false, baseManual:false };
   var inArr, outArr, grid;
 
   if(mode==='c'){ inArr=d.vh; outArr=d.vho; grid=VEH_HOURS; }
@@ -3252,12 +3582,18 @@ function densityOfDay(d, mode){
      คิดฐานด้วยสูตรเดียวกันทั้งสองโหมดจึงถูกต้องกว่าและอธิบายง่ายกว่า */
   var firstHour = DENS_HOURS[0];
   var base = 0;
-  for(var gi=0; gi<grid.length; gi++){
-    if(grid[gi] < firstHour) base += (inArr[gi]||0) - (outArr[gi]||0);
+  var manual = (opt && Number.isFinite(opt.base)) ? opt.base : null;
+  if(manual !== null){
+    base = manual;
+    res.baseManual = true;
+  } else {
+    for(var gi=0; gi<grid.length; gi++){
+      if(grid[gi] < firstHour) base += (inArr[gi]||0) - (outArr[gi]||0);
+    }
   }
   /* ฐานติดลบไม่มีความหมายทางกายภาพ (คนออกมากกว่าเข้าก่อนห้างเปิด = ข้อมูลคลาดเคลื่อน)
      ปัดขึ้นเป็น 0 ดีกว่าปล่อยให้ค่าติดลบไหลไปทั้งวัน */
-  if(base < 0) base = 0;
+  if(base < 0){ base = 0; res.baseClamped = true; }
   res.base = base;
 
   var cur = base;
@@ -3265,8 +3601,12 @@ function densityOfDay(d, mode){
     var idx = grid.indexOf(DENS_HOURS[k]);
     var vin  = idx>=0 ? (inArr[idx]||0)  : 0;
     var vout = idx>=0 ? (outArr[idx]||0) : 0;
-    cur = cur + vin - vout;
-    if(cur < 0) cur = 0;          // จำนวนคน/รถ "ที่อยู่ข้างใน" ติดลบไม่ได้
+    var raw = cur + vin - vout;
+    if(raw < 0){                  // จำนวนคน/รถ "ที่อยู่ข้างใน" ติดลบไม่ได้
+      res.clamped.push({ hour: DENS_HOURS[k], raw: raw });
+      raw = 0;
+    }
+    cur = raw;
     res.values.push(cur);
   }
   res.hasData = false;
@@ -3280,23 +3620,36 @@ function densityOfDay(d, mode){
 
 /* ความหนาแน่นเฉลี่ยของหลายวัน — ใช้ค่าเฉลี่ยรายชั่วโมง ไม่ใช่ผลรวม
    เพราะ "ความหนาแน่น" เป็นค่า ณ ขณะหนึ่ง การเอามาบวกกันไม่มีความหมาย */
-function densityAvg(days, mode){
-  if(!days.length) return { hours:DENS_HOURS.slice(), values:DENS_HOURS.map(function(){return 0;}), peak:null, peakHour:null, n:0 };
+function densityAvg(days, mode, opt){
+  if(!days.length) return { hours:DENS_HOURS.slice(), values:DENS_HOURS.map(function(){return 0;}),
+                            peak:null, peakHour:null, n:0,
+                            clampDays:0, clampHours:[], baseManual:false };
   /* หารด้วย "จำนวนวันที่มีข้อมูลรายชั่วโมงจริง" ไม่ใช่จำนวนวันทั้งหมด
      ไฟล์บางเดือนไม่มีตารางรายชั่วโมงเลย ถ้านับวันพวกนั้นในตัวหาร
      เส้นความหนาแน่นและ KPI จะต่ำกว่าความจริงหลายสิบเปอร์เซ็นต์แบบไม่มีสัญญาณเตือน
      (gateHourly ใช้ตัวนับแยกอยู่แล้ว ตรงนี้จึงต้องทำให้ตรงกัน) */
   var acc = zeros(DENS_HOURS.length), baseSum = 0, counted = 0;
+  /* รวบรวมวันและชั่วโมงที่ค่าติดลบถูกปัดเป็น 0 เพื่อเอาไปเตือนผู้ใช้
+     ไม่เก็บทุกวันเพราะช่วงยาว ๆ อาจมีเป็นร้อยวัน เก็บตัวอย่างไว้ 12 วันพอให้ไล่ตรวจได้ */
+  var clampDays = 0, clampHourSet = Object.create(null), clampSample = [];
   days.forEach(function(d){
-    var r = densityOfDay(d, mode);
+    var r = densityOfDay(d, mode, opt);
     if(!r.hasData) return;
     counted++;
     baseSum += r.base;
+    if(r.clamped.length){
+      clampDays++;
+      if(clampSample.length < 12) clampSample.push({ d:d.d, hours:r.clamped.map(function(x){ return x.hour; }) });
+      r.clamped.forEach(function(x){ clampHourSet[x.hour] = (clampHourSet[x.hour]||0) + 1; });
+    }
     r.values.forEach(function(v,i){ acc[i]+=v; });
   });
+  var clampHours = Object.keys(clampHourSet).map(Number).sort(function(a,b){ return a-b; });
+  var baseManual = !!(opt && Number.isFinite(opt.base));
   if(!counted){
     return { hours:DENS_HOURS.slice(), values:DENS_HOURS.map(function(){return 0;}),
-             base:0, peak:null, peakHour:null, n:0, skipped:days.length };
+             base:0, peak:null, peakHour:null, n:0, skipped:days.length,
+             clampDays:0, clampHours:[], clampSample:[], baseManual:baseManual };
   }
   var vals = acc.map(function(v){ return v/counted; });
   var mx=-Infinity, mi=-1;
@@ -3308,8 +3661,49 @@ function densityAvg(days, mode){
   var hasPeak = mi>=0 && mx>0;
   return { hours:DENS_HOURS.slice(), values:vals, base:baseSum/counted,
            peak: hasPeak ? mx : null, peakHour: hasPeak ? DENS_HOURS[mi] : null,
-           n:counted, skipped:days.length-counted };
+           peakIdx: hasPeak ? mi : -1,
+           n:counted, skipped:days.length-counted,
+           clampDays:clampDays, clampHours:clampHours, clampSample:clampSample,
+           baseManual:baseManual };
 }
+
+/* ---- โซนความหนาแน่น (v3.6) ----
+   แบ่งค่าความหนาแน่นเป็น 3 ระดับเพื่อให้อ่านสถานะได้ทันทีโดยไม่ต้องตีความตัวเลข
+   ถ้าผู้ใช้กรอกเกณฑ์เอง (รู้ความจุจริงของพื้นที่) ให้ใช้ค่านั้น
+   ถ้าไม่กรอก คำนวณจากค่าสูงสุดของช่วงที่เลือกเป็น 60% / 85%
+     — เป็นเกณฑ์ "เทียบกับตัวเอง" ไม่ใช่ความจุจริง จึงต้องเขียนกำกับบนหน้าจอให้ชัด
+       ว่าสีแดงแปลว่า "แน่นที่สุดเมื่อเทียบกับช่วงนี้" ไม่ใช่ "เกินความจุ" */
+/* ยอดตั้งต้นที่ผู้ใช้ตั้งไว้ของโหมดนั้น ๆ — ต้องใช้ตัวนี้ทุกจุดที่เรียกเครื่องคำนวณ
+   ไม่งั้นหน้าความหนาแน่นจะใช้ค่าที่กรอกเอง แต่รายงาน A4 กับ Infographic ใช้ค่าอัตโนมัติ
+   แล้วเอกสารที่ส่งผู้บริหารจะมีตัวเลขไม่ตรงกับหน้าจอที่ผู้ใช้ดูอยู่ */
+function densOptOf(mode){
+  var b = CFG.densBase && CFG.densBase[mode];
+  return Number.isFinite(b) ? { base: b } : null;
+}
+
+function densZones(mode, maxVal){
+  var cfg = (CFG.densZone && CFG.densZone[mode]) || null;
+  if(cfg && Number.isFinite(cfg.mid) && Number.isFinite(cfg.high) && cfg.high > cfg.mid && cfg.mid > 0){
+    return { mid:cfg.mid, high:cfg.high, manual:true };
+  }
+  var mx = Number.isFinite(maxVal) && maxVal > 0 ? maxVal : 0;
+  if(!mx) return { mid:0, high:0, manual:false, empty:true };
+  return { mid: Math.round(mx*0.60), high: Math.round(mx*0.85), manual:false };
+}
+function densZoneOf(v, z){
+  if(!z || z.empty || !Number.isFinite(v)) return 'lo';
+  if(v >= z.high) return 'hi';
+  if(v >= z.mid)  return 'mid';
+  return 'lo';
+}
+/* สีของแต่ละโซน — ใช้ชุดเดียวกับสีสถานะทั้งแอป (เขียว/ทอง/กุหลาบ)
+   ไม่ใช้เขียว-เหลือง-แดงสดแบบสัญญาณไฟ เพราะจะตีกับจานสีของระบบและอ่านยากในโหมดมืด */
+function densZoneColor(zone){
+  if(zone==='hi')  return cssVar('--err-fill') || '#E94560';
+  if(zone==='mid') return cssVar('--c-gold')   || '#EBB400';
+  return cssVar('--ok') || '#008960';
+}
+var DENS_ZONE_LABEL = { lo:'ปลอดโปร่ง', mid:'ปานกลาง', hi:'แออัด' };
 
 /* ความหนาแน่นรายประตู — ใช้ข้อมูลรายชั่วโมงแยกประตูจาก backend
    ประตูนับได้เฉพาะ "ลูกค้า" เพราะช่องทางรถเข้า/ออกเป็นคนละชุดกัน จับคู่ไม่ได้ */
@@ -3558,10 +3952,11 @@ function backtest(days, field, horizon){
    ส่วนที่ 13 · ตรวจสอบคุณภาพข้อมูล
    รวมทุกเช็คที่เคยกระจายอยู่ใน 3 แอปเดิมไว้ที่เดียว
 ============================================================================ */
-function analyzeQuality(days, dupes){
+function analyzeQuality(days, dupes, invalid){
   var q = {
     blankDays: [], missingDays: [], mismatch: [], noGateRows: [], noVehRows: [],
     negatives: [], gateCountShift: [], duplicates: dupes||[], outOfOrder: [],
+    invalidDates: invalid||[],
     range: days.length ? { from:days[0].d, to:days[days.length-1].d } : null,
     totalDays: days.length
   };
@@ -3713,8 +4108,10 @@ function analyzeQuality(days, dupes){
   var expected = q.totalDays + q.missingDays.length;
   var pct = expected>0 ? clamp(100 - (problemDays/expected*100), 0, 100) : 0;
   q.score = {
-    problems: problemDays,
-    problemItems: q.blankDays.length + q.missingDays.length + q.mismatch.length
+    /* วันที่ผิดไม่อยู่ใน badDays (ไม่ใช่วันจริงในปฏิทิน) จึงบวกเพิ่มตรง ๆ
+       ไม่งั้นป้ายบนเมนูจะขึ้น 0 ทั้งที่มีแท็บถูกตัดทิ้งไป */
+    problems: problemDays + q.invalidDates.length,
+    problemItems: q.invalidDates.length + q.blankDays.length + q.missingDays.length + q.mismatch.length
                 + q.noGateRows.length + q.noVehRows.length + q.negatives.length
                 + q.duplicates.filter(function(x){return !x.resolved;}).length,
     pct: pct,
@@ -3947,6 +4344,102 @@ function applyDualAxis_(data, opt){
   });
 }
 
+/* ---- ปลั๊กอินวาดป้ายบอก "จุดสูงสุด" บนกราฟ (v3.6) ----
+   ทำงานเฉพาะกราฟที่ตั้ง options.plugins.sbkPeak = { index, text } เท่านั้น
+   ทำไมต้องเขียนเอง: ผู้บริหารดูกราฟแล้วต้องรู้ทันทีว่า "แน่นที่สุดกี่โมง กี่คน"
+   โดยไม่ต้องเอาเมาส์ไปชี้ — ซึ่งบนแท็บเล็ตและบนรายงานที่พิมพ์ออกมาทำไม่ได้เลย
+   ป้ายถูกจำกัดไม่ให้ล้นขอบกราฟ จึงอ่านได้แม้จุดสูงสุดอยู่ริมซ้าย/ขวาสุด */
+var SBK_PEAK_PLUGIN = {
+  id: 'sbkPeak',
+  afterDatasetsDraw: function(chart, args, opts){
+    if(!opts || !opts.text) return;
+    var i = opts.index;
+    if(!(i >= 0)) return;
+    var meta = chart.getDatasetMeta(opts.dataset || 0);
+    if(!meta || !meta.data || !meta.data[i]) return;
+    var pt = meta.data[i], area = chart.chartArea, c = chart.ctx;
+    if(!area) return;
+
+    var accent = opts.color || '#E94560';
+    var padX = 8, padY = 5, r = 7;
+    c.save();
+    c.font = '600 11.5px Sarabun, sans-serif';
+    var w = c.measureText(opts.text).width + padX*2;
+    var h = 22;
+
+    /* วางป้ายเหนือจุด ถ้าชนขอบบนให้ย้ายไปไว้ใต้จุดแทน */
+    var below = (pt.y - h - 12) < area.top;
+    var bx = pt.x - w/2;
+    var by = below ? (pt.y + 12) : (pt.y - h - 12);
+    if(bx < area.left) bx = area.left;
+    if(bx + w > area.right) bx = area.right - w;
+
+    // เส้นโยงจากจุดถึงป้าย
+    c.strokeStyle = accent; c.lineWidth = 1.4;
+    c.beginPath();
+    c.moveTo(pt.x, pt.y + (below ? r : -r));
+    c.lineTo(pt.x, below ? by : by + h);
+    c.stroke();
+
+    // กล่องป้าย
+    c.fillStyle = accent;
+    c.beginPath();
+    if(c.roundRect) c.roundRect(bx, by, w, h, 6);
+    else c.rect(bx, by, w, h);
+    c.fill();
+
+    c.fillStyle = '#ffffff';
+    c.textAlign = 'left'; c.textBaseline = 'middle';
+    c.fillText(opts.text, bx + padX, by + h/2 + 0.5);
+
+    // วงแหวนเน้นที่ตัวจุดเอง
+    c.beginPath();
+    c.arc(pt.x, pt.y, r, 0, Math.PI*2);
+    c.strokeStyle = accent; c.lineWidth = 2.6; c.stroke();
+    c.beginPath();
+    c.arc(pt.x, pt.y, r, 0, Math.PI*2);
+    c.fillStyle = 'rgba(255,255,255,.28)'; c.fill();
+    c.restore();
+  }
+};
+var SBK_PLUGINS_READY = false;
+function ensureChartPlugins(){
+  if(SBK_PLUGINS_READY || typeof Chart === 'undefined') return;
+  try{ Chart.register(SBK_PEAK_PLUGIN); SBK_PLUGINS_READY = true; }catch(e){}
+}
+
+/* ไล่ระดับสีใต้เส้นกราฟตามโซนความหนาแน่น — สีเปลี่ยนตาม "ความสูง" ของค่า
+   ไม่ใช่ตามตำแหน่งบนแกนเวลา จึงอ่านได้ว่าช่วงไหนของวันแตะโซนแออัดบ้าง
+   ต้องคืนเป็นฟังก์ชัน เพราะตอนสร้าง config ยังไม่มี chartArea ให้คำนวณพิกัด */
+function densZoneGradient(z){
+  return function(ctx){
+    var chart = ctx.chart, area = chart.chartArea, sc = chart.scales && chart.scales.y;
+    if(!area || !sc) return 'transparent';
+    var g = chart.ctx.createLinearGradient(0, area.bottom, 0, area.top);
+    var span = area.bottom - area.top;
+    function stopAt(v){
+      if(!span) return 0;
+      var t = (area.bottom - sc.getPixelForValue(v)) / span;
+      return clamp(t, 0, 1);
+    }
+    var A = .34, B = .30;   // ความทึบของพื้นที่แรเงา
+    if(!z || z.empty){
+      g.addColorStop(0, withAlpha(densZoneColor('lo'), A));
+      g.addColorStop(1, withAlpha(densZoneColor('lo'), 0.04));
+      return g;
+    }
+    var m = stopAt(z.mid), h = stopAt(z.high);
+    if(h < m) h = m;
+    g.addColorStop(0, withAlpha(densZoneColor('lo'), A));
+    g.addColorStop(Math.max(0, m - 0.001), withAlpha(densZoneColor('lo'), A));
+    g.addColorStop(Math.min(1, m), withAlpha(densZoneColor('mid'), B));
+    g.addColorStop(Math.max(0, Math.min(1, h - 0.001)), withAlpha(densZoneColor('mid'), B));
+    g.addColorStop(Math.min(1, h), withAlpha(densZoneColor('hi'), B));
+    g.addColorStop(1, withAlpha(densZoneColor('hi'), B));
+    return g;
+  };
+}
+
 function makeChart(canvasId, type, data, extra){
   var cv = $(canvasId);
   if(typeof Chart==='undefined'){
@@ -3963,6 +4456,7 @@ function makeChart(canvasId, type, data, extra){
     return null;
   }
   if(!cv) return null;
+  ensureChartPlugins();
   if(STATE.charts[canvasId]){ try{ STATE.charts[canvasId].destroy(); }catch(e){} }
   var opt = deepMerge(chartDefaults(), extra||{});
   try{ applyDualAxis_(data, opt); }catch(e){}      // ตกแต่งล้มเหลวต้องไม่ทำให้กราฟไม่ขึ้น
@@ -4644,7 +5138,12 @@ function renderIntensity(){
 
   var mode = STATE.intensityMode;
   var M = DENS_META[mode];
-  var dens = densityAvg(days, mode);
+
+  /* ยอดตั้งต้นที่ผู้ใช้กรอกไว้ (ถ้ามี) ต้องส่งเข้าเครื่องคำนวณทุกจุดในหน้านี้
+     ไม่งั้นการ์ด KPI กับกราฟจะใช้ฐานคนละค่ากัน */
+  var baseCfg  = (CFG.densBase && Number.isFinite(CFG.densBase[mode])) ? CFG.densBase[mode] : null;
+  var densOpt  = baseCfg !== null ? { base: baseCfg } : null;
+  var dens = densityAvg(days, mode, densOpt);
 
   // เปรียบเทียบตามประเภทวัน — พฤติกรรมคนวันธรรมดากับวันหยุดต่างกันมาก
   var groups = [
@@ -4655,7 +5154,7 @@ function renderIntensity(){
   ].filter(function(g){ return g.days.length>0; });
 
   // วันที่หนาแน่นสูงสุดในช่วง
-  var perDay = days.map(function(d){ var r=densityOfDay(d,mode); return { d:d.d, peak:r.peak, hour:r.peakHour }; })
+  var perDay = days.map(function(d){ var r=densityOfDay(d,mode,densOpt); return { d:d.d, peak:r.peak, hour:r.peakHour }; })
                    .filter(function(x){ return Number.isFinite(x.peak); })
                    .sort(function(a,b){ return b.peak-a.peak; });
 
@@ -4663,14 +5162,62 @@ function renderIntensity(){
   var densMax     = dens.values.length ? Math.max.apply(null, dens.values) : 0;
   var peakHourIdx = densMax > 0 ? dens.values.indexOf(densMax) : -1;
 
+  var zMax  = dens.values.length ? Math.max.apply(null, dens.values.map(Math.round)) : 0;
+  var zone  = densZones(mode, zMax);
+  var zCfg  = (CFG.densZone && CFG.densZone[mode]) || null;
+  /* ค่าที่ระบบคำนวณได้เอง ใช้โชว์เป็น placeholder ให้ผู้ใช้เห็นว่า "ถ้าไม่กรอกจะได้เท่าไร"
+     ถ้าผู้ใช้ยังไม่ได้กรอก dens.base ก็คือค่านั้นอยู่แล้ว ไม่ต้องเดินข้อมูลซ้ำอีกรอบ
+     (เดินซ้ำจะเสียเวลาเปล่าราว 100 มิลลิวินาทีที่ข้อมูล 2,000 วัน) */
+  var autoBase = Math.round((baseCfg === null ? dens.base : densityAvg(days, mode, null).base) || 0);
+
   host.innerHTML =
-      '<div class="card"><div class="card-b flex flex-wrap items-center gap-3">'
-    +   '<div class="seg" id="densMode">'
-    +     '<button data-m="p" class="'+(mode==='p'?'on':'')+'">👥 ลูกค้า</button>'
-    +     '<button data-m="c" class="'+(mode==='c'?'on':'')+'">🚗 รถยนต์</button>'
+      '<div class="card"><div class="card-b">'
+    +   '<div class="flex flex-wrap items-center gap-3">'
+    +     '<div class="seg" id="densMode">'
+    +       '<button data-m="p" class="'+(mode==='p'?'on':'')+'">👥 ลูกค้า</button>'
+    +       '<button data-m="c" class="'+(mode==='c'?'on':'')+'">🚗 รถยนต์</button>'
+    +     '</div>'
+    +     '<span class="hint flex-1 min-w-[240px]">'+esc(M.formula)+'</span>'
     +   '</div>'
-    +   '<span class="hint flex-1 min-w-[240px]">'+esc(M.formula)+'</span>'
+
+    /* ---- ยอดตั้งต้น + เกณฑ์โซน (v3.6) ----
+       วางไว้บนสุดเพราะเป็น "ตัวแปรของการคำนวณ" ไม่ใช่ผลลัพธ์
+       ผู้ใช้ควรเห็นก่อนว่ากำลังคำนวณด้วยสมมติฐานอะไร แล้วค่อยอ่านตัวเลข */
+    +   '<div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 pt-3 border-t" style="border-color:var(--line)">'
+    +     '<div>'
+    +       '<label class="lb" for="densBaseIn">ยอดตั้งต้น ณ '+hourLabel(DENS_HOURS[0])+' น. ('+esc(M.unit)+')</label>'
+    +       '<input type="number" min="0" step="1" class="inp w-full" id="densBaseIn" '
+    +         'placeholder="อัตโนมัติ ('+fmt(autoBase)+')" value="'+(baseCfg!==null?baseCfg:'')+'">'
+    +       '<div class="hint mt-1">'+(baseCfg!==null
+              ? 'กำลังใช้ค่าที่กรอกเอง — ระบบคำนวณได้ '+fmt(autoBase)+' '+esc(M.unit)
+              : 'เว้นว่าง = คำนวณจากยอดสุทธิก่อน '+hourLabel(DENS_HOURS[0])+' น. อัตโนมัติ')+'</div>'
+    +     '</div>'
+    +     '<div>'
+    +       '<label class="lb" for="densMidIn">เริ่ม “ปานกลาง” ที่ ('+esc(M.unit)+')</label>'
+    +       '<input type="number" min="0" step="1" class="inp w-full" id="densMidIn" '
+    +         'placeholder="อัตโนมัติ ('+fmt(zone.mid)+')" value="'+(zCfg&&Number.isFinite(zCfg.mid)?zCfg.mid:'')+'">'
+    +     '</div>'
+    +     '<div>'
+    +       '<label class="lb" for="densHighIn">เริ่ม “แออัด” ที่ ('+esc(M.unit)+')</label>'
+    +       '<input type="number" min="0" step="1" class="inp w-full" id="densHighIn" '
+    +         'placeholder="อัตโนมัติ ('+fmt(zone.high)+')" value="'+(zCfg&&Number.isFinite(zCfg.high)?zCfg.high:'')+'">'
+    +     '</div>'
+    +   '</div>'
+    +   '<div class="flex flex-wrap items-center gap-2 mt-3">'
+    +     '<button class="btn btn-primary btn-sm" id="densApply">คำนวณใหม่</button>'
+    +     '<button class="btn btn-sm" id="densReset">คืนค่าอัตโนมัติ</button>'
+    +     '<span class="hint ml-auto">'
+    +       (zone.manual ? 'เกณฑ์โซนใช้ค่าที่กรอกเอง'
+                        : 'เกณฑ์โซนคำนวณจากค่าสูงสุดของช่วงนี้ (60% / 85%) — เป็นการเทียบกับตัวเอง ไม่ใช่ความจุจริงของพื้นที่')
+    +     '</span>'
+    +   '</div>'
     + '</div></div>'
+
+    /* ---- กล่องเตือนเมื่อมีค่าติดลบถูกปัดเป็น 0 ----
+       ค่าติดลบแปลว่า "ยอดออกมากกว่าจำนวนที่อยู่ข้างใน" ซึ่งเป็นไปไม่ได้ทางกายภาพ
+       สาเหตุจริงมักเป็นการคีย์ข้อมูลผิด หรือประตูที่นับเฉพาะขาออก
+       เดิมระบบปัดเป็น 0 เงียบ ๆ ผู้ใช้จึงไม่มีทางรู้ว่ากราฟถูกดัดแล้ว */
+    + (dens.clampDays ? densWarnBox(dens, M, baseCfg) : '')
 
     + '<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4 mt-4">'
     + kpiCard({ grad: mode==='p'?'g-indigo':'g-sky', icon:ICON.peak,
@@ -4693,8 +5240,14 @@ function renderIntensity(){
     + '</div>'
 
     + '<div class="mt-4">'
-    + card('เส้นความหนาแน่นเฉลี่ยรายชั่วโมง', 'จำนวน'+M.name+'ที่ยังอยู่ในศูนย์การค้า ณ แต่ละชั่วโมง',
-        chartBox('chDens', 340), exportBtns('chDens','ความหนาแน่น'+M.name))
+    + card('เส้นความหนาแน่นเฉลี่ยรายชั่วโมง',
+        'จำนวน'+M.name+'ที่ยังอยู่ในศูนย์การค้า ณ แต่ละชั่วโมง · พื้นที่ใต้เส้นแรเงาตามระดับความหนาแน่น',
+        chartBox('chDens', 340,
+          'กราฟเส้นความหนาแน่น'+M.name+'รายชั่วโมง '+hourLabel(DENS_HOURS[0])+'–'+hourLabel(DENS_HOURS[DENS_HOURS.length-1])+' น. '
+          + (dens.peak!==null ? 'สูงสุด '+fmt(dens.peak)+' '+M.unit+' เวลา '+hourLabel(dens.peakHour)+' น.' : 'ไม่มีข้อมูล')
+          + ' · ตัวเลขทุกชั่วโมงดูได้จากตารางความหนาแน่นด้านล่าง')
+        + densZoneLegend(zone, M),
+        exportBtns('chDens','ความหนาแน่น'+M.name))
     + '</div>'
 
     + '<div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">'
@@ -4741,10 +5294,112 @@ function renderIntensity(){
       renderIntensity();
     };
   });
+
+  /* ---- ปุ่มคำนวณใหม่ / คืนค่าอัตโนมัติ (v3.6) ----
+     อ่านค่าจากช่องกรอก ตรวจความถูกต้อง แล้วเก็บลง CFG เพื่อให้จำไว้ข้ามการเปิดโปรแกรม
+     ช่องว่าง = กลับไปใช้ค่าอัตโนมัติ ไม่ใช่ 0 (0 เป็นค่าที่ตั้งใจกรอกได้จริง จึงต้องแยกกัน) */
+  function readNum(id){
+    var el = $(id); if(!el) return null;
+    var t = String(el.value).trim();
+    if(t === '') return null;
+    var v = Number(t);
+    return Number.isFinite(v) ? v : NaN;   // NaN = กรอกมาแล้วแต่ไม่ใช่ตัวเลข
+  }
+  function applyDens(){
+    var b  = readNum('densBaseIn');
+    var m1 = readNum('densMidIn');
+    var m2 = readNum('densHighIn');
+
+    if(Number.isNaN(b) || Number.isNaN(m1) || Number.isNaN(m2)){
+      toast('กรุณากรอกเป็นตัวเลขเท่านั้น หรือเว้นว่างเพื่อใช้ค่าอัตโนมัติ','err'); return;
+    }
+    if(b !== null && b < 0){
+      toast('ยอดตั้งต้นติดลบไม่ได้ — จำนวน'+M.name+'ที่ค้างอยู่ต้องเป็น 0 ขึ้นไป','err'); return;
+    }
+    /* เกณฑ์สองตัวต้องมาคู่กันเสมอ กรอกมาตัวเดียวแล้วอีกตัวเป็นอัตโนมัติจะได้เส้นแบ่งที่ขัดกันเอง */
+    if((m1 === null) !== (m2 === null)){
+      toast('เกณฑ์ “ปานกลาง” และ “แออัด” ต้องกรอกทั้งคู่ หรือเว้นว่างทั้งคู่','warn'); return;
+    }
+    if(m1 !== null && !(m2 > m1 && m1 > 0)){
+      toast('เกณฑ์ไม่ถูกต้อง — “แออัด” ต้องมากกว่า “ปานกลาง” และทั้งคู่ต้องมากกว่า 0','err'); return;
+    }
+
+    if(!CFG.densBase) CFG.densBase = { p:null, c:null };
+    if(!CFG.densZone) CFG.densZone = { p:null, c:null };
+    CFG.densBase[mode] = b;
+    CFG.densZone[mode] = (m1 === null) ? null : { mid:m1, high:m2 };
+    saveCfg();
+    try{ cleanupGateSelects(); }catch(e){}
+    renderIntensity();
+    toast('คำนวณใหม่เรียบร้อยแล้ว','ok');
+  }
+  var apply = $('densApply');
+  if(apply) apply.onclick = applyDens;
+  /* กด Enter ในช่องกรอกต้องได้ผลเหมือนกดปุ่ม — ไม่งั้นผู้ใช้พิมพ์เสร็จแล้วงงว่าทำไมไม่เปลี่ยน */
+  ['densBaseIn','densMidIn','densHighIn'].forEach(function(id){
+    var el = $(id);
+    if(el) el.onkeydown = function(ev){ if(ev.key === 'Enter'){ ev.preventDefault(); applyDens(); } };
+  });
+  var rst = $('densReset');
+  if(rst) rst.onclick = function(){
+    if(!CFG.densBase) CFG.densBase = { p:null, c:null };
+    if(!CFG.densZone) CFG.densZone = { p:null, c:null };
+    CFG.densBase[mode] = null;
+    CFG.densZone[mode] = null;
+    saveCfg();
+    try{ cleanupGateSelects(); }catch(e){}
+    renderIntensity();
+    toast('กลับไปใช้ค่าอัตโนมัติแล้ว','ok');
+  };
+
   if(mode==='p'){
     var gl = densGateList();
     bindGateSelect('densPicker', gl, 'intensityGates', function(){ drawGateHourChart(filteredDays()); });
   }
+}
+
+/* ---- กล่องเตือนค่าติดลบที่ถูกปัดเป็น 0 (v3.6) ----
+   บอกให้ครบสามอย่าง: เกิดกี่วัน · ชั่วโมงไหนบ่อยที่สุด · ต้องไปตรวจอะไรต่อ
+   ไม่ใช่แค่ขึ้นว่า "ข้อมูลผิดปกติ" ซึ่งผู้ใช้เอาไปทำอะไรต่อไม่ได้ */
+function densWarnBox(dens, M, baseCfg){
+  var hrs = (dens.clampHours||[]).map(function(h){ return hourLabel(h)+' น.'; }).join(' · ');
+  var sample = (dens.clampSample||[]).slice(0,6)
+                 .map(function(x){ return thDate(x.d,'short'); }).join(' · ');
+  var more = (dens.clampDays||0) - Math.min(6, (dens.clampSample||[]).length);
+  return '<div class="card mt-4" style="border-inline-start:3px solid var(--warn)"><div class="card-b">'
+    + '<b style="color:var(--warn)">! ตรวจพบยอดคงเหลือติดลบ ' + fmt(dens.clampDays) + ' วัน — ระบบปรับเป็น 0 ให้แล้ว</b>'
+    + '<div class="mt-2 text-[13px]" style="color:var(--muted);line-height:1.75">'
+    +   'ยอด'+esc(M.name)+'ออกมากกว่าจำนวนที่อยู่ข้างในขณะนั้น ซึ่งเป็นไปไม่ได้ในทางกายภาพ '
+    +   'ค่าที่แสดงบนกราฟจึงถูกปัดขึ้นเป็น 0 ในชั่วโมงเหล่านั้น <b>ตัวเลขช่วงนั้นจะต่ำกว่าความจริง</b>'
+    +   (hrs ? '<div class="mt-2"><b>ชั่วโมงที่พบ:</b> ' + esc(hrs) + '</div>' : '')
+    +   (sample ? '<div class="mt-1"><b>ตัวอย่างวันที่:</b> ' + esc(sample)
+                + (more > 0 ? ' และอีก ' + fmt(more) + ' วัน' : '') + '</div>' : '')
+    +   '<div class="mt-2"><b>สาเหตุที่พบบ่อย:</b> '
+    +     (baseCfg === null
+        ? 'ยอดตั้งต้นต่ำเกินจริง (มีคนค้างอยู่ก่อน ' + hourLabel(DENS_HOURS[0]) + ' น. มากกว่าที่ระบบคำนวณได้) — '
+          + 'ลองกรอก “ยอดตั้งต้น” ด้านบนแล้วกดคำนวณใหม่'
+        : 'ยอดตั้งต้นที่กรอกไว้ (' + fmt(baseCfg) + ' ' + esc(M.unit) + ') อาจต่ำเกินไป ลองเพิ่มขึ้นแล้วคำนวณใหม่')
+    +     ' หรือไฟล์ต้นทางคีย์ยอดออกเกิน — ตรวจได้ที่หน้า <b>คุณภาพข้อมูล</b></div>'
+    + '</div></div></div>';
+}
+
+/* ---- คำอธิบายโซนความหนาแน่น ----
+   ต้องบอกช่วงตัวเลขจริงของแต่ละสี ไม่ใช่แค่โชว์สี ไม่งั้นผู้ใช้ตีความเองคนละแบบ */
+function densZoneLegend(z, M){
+  if(!z || z.empty) return '';
+  function item(zone, range){
+    return '<span class="flex items-center gap-1.5">'
+      + '<i style="width:12px;height:12px;border-radius:3px;display:inline-block;background:'
+      +   withAlpha(densZoneColor(zone), .55) + ';border:1px solid ' + densZoneColor(zone) + '"></i>'
+      + esc(DENS_ZONE_LABEL[zone]) + ' <span style="color:var(--faint)">' + esc(range) + '</span></span>';
+  }
+  return '<div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-[12px]" style="color:var(--muted)">'
+    + item('lo',  'ต่ำกว่า ' + fmt(z.mid) + ' ' + M.unit)
+    + item('mid', fmt(z.mid) + '–' + fmt(z.high) + ' ' + M.unit)
+    + item('hi',  fmt(z.high) + ' ' + M.unit + ' ขึ้นไป')
+    + '<span class="ml-auto" style="color:var(--faint)">'
+    +   (z.manual ? 'เกณฑ์ที่ตั้งไว้เอง' : 'เกณฑ์อัตโนมัติจากช่วงที่เลือก')
+    + '</span></div>';
 }
 
 /* รายชื่อประตูที่ใช้ในดรอปดาวน์ของหน้านี้ — เรียงตามยอดรวมจากมากไปน้อย */
@@ -4772,7 +5427,7 @@ function densTable(groups, mode){
            + DENS_HOURS.map(function(h){ return '<th class="no-sort">'+hourLabel(h)+'</th>'; }).join('')
            + '<th class="no-sort">สูงสุด</th>';
   var rows = groups.map(function(g){
-    var r = densityAvg(g.days, mode);
+    var r = densityAvg(g.days, mode, densOptOf(mode));
     return '<tr><td>'+esc(g.label)+'</td><td class="num">'+fmt(g.days.length)+'</td>'
       + r.values.map(function(v,i){
           var mx = Math.max.apply(null, r.values)||1;
@@ -4788,19 +5443,59 @@ function densTable(groups, mode){
 function drawIntensityCharts(dens, groups, days, mode){
   var M = DENS_META[mode];
 
+  /* ---- กราฟเส้นความหนาแน่น พร้อมโซนสีและจุดสูงสุด (v3.6) ---- */
+  var vals = dens.values.map(Math.round);
+  var vMax = vals.length ? Math.max.apply(null, vals) : 0;
+  var z    = densZones(mode, vMax);
+  var pIdx = dens.peakIdx;
+  if(!(pIdx >= 0)) pIdx = -1;
+
+  /* จุดทุกจุดใช้สีตามโซนของตัวเอง ส่วนจุดสูงสุดเป็นสีกุหลาบเข้มและใหญ่กว่า
+     ทำให้กวาดตาครั้งเดียวก็เห็นทั้ง "รูปทรงของวัน" และ "จุดที่ต้องเตรียมกำลังคน" */
+  var peakColor = densZoneColor('hi');
+  var ptColors  = vals.map(function(v,i){
+    return i === pIdx ? peakColor : densZoneColor(densZoneOf(v, z));
+  });
+  var ptRadius  = vals.map(function(_,i){ return i === pIdx ? 0 : 3.2; });  // จุดสูงสุดวาดด้วยปลั๊กอินแทน
+  var ptBorder  = vals.map(function(_,i){ return i === pIdx ? 0 : 1.5; });
+
   makeChart('chDens','line', {
     labels: DENS_HOURS.map(hourLabel),
     datasets: [{ label:'ความหนาแน่นเฉลี่ย ('+M.unit+')', unit:M.unit,
-                 data: dens.values.map(Math.round),
-                 borderColor:M.color, backgroundColor:withAlpha(M.color,.28), fill:true,
-                 tension:.35, borderWidth:2.6, pointRadius:3.4, pointHoverRadius:6,
-                 pointBackgroundColor:M.color }]
-  }, { plugins:{ legend:{ display:false } } });
+                 data: vals,
+                 borderColor:M.color,
+                 backgroundColor: densZoneGradient(z),
+                 fill:true, tension:.35, borderWidth:2.8,
+                 pointRadius: ptRadius, pointHoverRadius:6,
+                 pointBackgroundColor: ptColors,
+                 pointBorderColor: cssVar('--surface') || '#fff',
+                 pointBorderWidth: ptBorder,
+                 /* เส้นเปลี่ยนสีตามโซนของปลายแต่ละช่วง ทำให้เห็นรอยต่อของโซนบนตัวเส้นเอง */
+                 segment: {
+                   borderColor: function(c){
+                     var v = c.p1 && c.p1.parsed ? c.p1.parsed.y : null;
+                     return densZoneColor(densZoneOf(v, z));
+                   }
+                 } }]
+  }, {
+    plugins:{
+      legend:{ display:false },
+      sbkPeak: (pIdx >= 0 && dens.peak !== null)
+        ? { index: pIdx, dataset: 0, color: peakColor,
+            text: 'สูงสุด ' + fmt(dens.peak) + ' ' + M.unit + ' · ' + hourLabel(dens.peakHour) + ' น.' }
+        : { text: null },
+      tooltip:{ callbacks:{ afterLabel:function(c){
+        /* บอกโซนในทูลทิปด้วย ไม่ใช่ให้เดาจากสี — คนตาบอดสีอ่านจากสีอย่างเดียวไม่ได้ */
+        return '  สถานะ: ' + DENS_ZONE_LABEL[densZoneOf(c.parsed.y, z)];
+      } } }
+    },
+    scales:{ y:{ beginAtZero:true } }
+  });
 
   makeChart('chDensDow','line', {
     labels: DENS_HOURS.map(hourLabel),
     datasets: groups.map(function(g){
-      var r = densityAvg(g.days, mode);
+      var r = densityAvg(g.days, mode, densOptOf(mode));
       return { label:g.label+' ('+g.days.length+' วัน)', unit:M.unit, data:r.values.map(Math.round),
                borderColor:g.color, backgroundColor:'transparent', tension:.35,
                borderWidth:2.1, pointRadius:2.4, pointHoverRadius:5 };
@@ -4994,7 +5689,11 @@ function renderHourly(){
 ============================================================================ */
 function renderCompare(){
   var host = $('v-compare');
-  if(!DATA.days.length){ host.innerHTML = card('เทียบช่วงเวลา','', emptyState('ยังไม่มีข้อมูล','')); return; }
+  if(!DATA.days.length){ host.innerHTML = card('เปรียบเทียบหลายมิติ','', emptyState('ยังไม่มีข้อมูล','')); return; }
+
+  /* โหมดเทียบรายวันทำงานคนละกติกากับอีกสามโหมด (เทียบ "วันเดียว" ไม่ใช่ "ช่วง")
+     จึงแยกฟังก์ชันออกไป แทนการยัด if ซ้อนกันในฟังก์ชันเดียวจนตามอ่านไม่ไหว */
+  if(STATE.compare.mode === 'day'){ renderDayCompare(host); return; }
 
   var f = STATE.filter;
   /* ถ้าตัวกรองยังไม่ถูกตั้งค่า (เช่นเปิดหน้านี้ก่อนโหลดข้อมูลเสร็จ) ให้ใช้ช่วงของข้อมูลทั้งหมดแทน
@@ -5054,6 +5753,17 @@ function renderCompare(){
   var A = aggregate(pick(aFrom,aTo), f.floor);
   var B = aggregate(pick(bFrom,bTo), f.floor);
 
+  /* (v3.9) ช่วงที่เลือกเองว่างเปล่า — เดิมหลุดไปวาดการ์ดครบทุกใบที่มีแต่ขีด
+     พร้อม % "ไม่มีข้อมูลเทียบ" ผู้ใช้ไม่รู้ว่าต้องแก้ตรงไหน */
+  if(!A.n){
+    host.innerHTML = compareControls(aFrom,aTo,bFrom,bTo,modeLabel,LB)
+      + '<div class="mt-4">' + card('ผลการเปรียบเทียบ','',
+          emptyState('ไม่มีข้อมูลในช่วงที่เลือก', thDate(aFrom,'medium')+' – '+thDate(aTo,'medium')
+            + ' ไม่มีวันที่มีข้อมูลตามตัวกรองปัจจุบัน — ลองขยายช่วงวันที่ หรือปิดตัวกรองประเภทวัน')) + '</div>';
+    bindCompare();
+    return;
+  }
+
   if(!B.n){
     host.innerHTML = compareControls(aFrom,aTo,bFrom,bTo,modeLabel,LB)
       + '<div class="mt-4">' + card('ผลการเปรียบเทียบ','',
@@ -5108,10 +5818,8 @@ function renderCompare(){
   host.innerHTML = compareControls(aFrom,aTo,bFrom,bTo,modeLabel,LB)
     + '<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4 mt-4">'+kpis+'</div>'
 
-    + '<div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">'
-    + card('เทียบยอดรายชั่วโมง', 'ลูกค้าเข้าเฉลี่ยต่อวัน', chartBox('chCmpHour', 300))
-    + card('เทียบตามวันในสัปดาห์', 'ลูกค้าเข้าเฉลี่ยต่อวัน', chartBox('chCmpDow', 300))
-    + '</div>'
+    + '<div class="mt-4">' + cmpMultiBase(aFrom, aTo, A, pick, f.floor) + '</div>'
+    + '<div class="mt-4" id="cmpDimHost"></div>'
 
     + '<div class="mt-4">'
     + card('ตารางเปรียบเทียบภาพรวม', esc(LB.a)+' = '+thDate(aFrom,'medium')+'–'+thDate(aTo,'medium')+' ('+A.n+' วัน) · '+esc(LB.b)+' = '+thDate(bFrom,'medium')+'–'+thDate(bTo,'medium')+' ('+B.n+' วัน)',
@@ -5131,32 +5839,7 @@ function renderCompare(){
         '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblCmpGate\',\'เทียบรายประตู\')">ส่งออก Excel</button>')
     + '</div>';
 
-  var nA=A.n||1, nB=B.n||1;
-  makeChart('chCmpHour','line', {
-    labels: PED_HOURS.map(hourLabel),
-    datasets:[
-      { label:LB.a, unit:'คน', data:A.ph.map(function(v){ return Math.round(v/nA); }),
-        borderColor:tone('blue'), backgroundColor:withAlpha(tone('blue'),.25), fill:true, tension:.34, borderWidth:2.9, pointRadius:2.4 },
-      { label:LB.b, unit:'คน', data:B.ph.map(function(v){ return Math.round(v/nB); }),
-        borderColor:tone('gray'), backgroundColor:'transparent', borderDash:[5,4], tension:.34, borderWidth:2, pointRadius:2 }
-    ]
-  }, {});
-
-  /* วันในสัปดาห์ที่ไม่มีข้อมูลเลย ต้องคืน null ไม่ใช่ 0
-     Chart.js วาด 0 เป็นแท่งความสูงศูนย์ ซึ่งอ่านได้ว่า "วันนั้นไม่มีคนมาเลย"
-     ทั้งที่ความจริงคือ "ยังไม่มีข้อมูลของวันนั้น" — คนละเรื่องกันคนละทาง
-     (เช่น เทียบช่วง 1–5 ส.ค. ที่มีแค่ จ.–ศ. กับช่วงที่มีครบ 7 วัน) */
-  function dowAvg(agg){
-    return agg.byDow.map(function(l){ return l.length ? Math.round(sum(l.map(function(r){return r.custIn;}))/l.length) : null; });
-  }
-  makeChart('chCmpDow','bar', {
-    labels: TH_DOW_FULL,
-    datasets:[
-      { label:LB.a, unit:'คน', data:dowAvg(A), backgroundColor:tone('blue'), borderRadius:6, maxBarThickness:30 },
-      { label:LB.b, unit:'คน', data:dowAvg(B), backgroundColor:tone('gray'), borderRadius:6, maxBarThickness:30 }
-    ]
-  }, {});
-
+  renderCmpDim(A, B, LB);
   bindCompare();
 }
 
@@ -5169,6 +5852,7 @@ function compareControls(aFrom,aTo,bFrom,bTo,modeLabel,LB){
     +     '<button data-m="mom" class="'+(m==='mom'?'on':'')+'">เทียบช่วงก่อนหน้า</button>'
     +     '<button data-m="yoy" class="'+(m==='yoy'?'on':'')+'">เทียบปีก่อน (YoY)</button>'
     +     '<button data-m="custom" class="'+(m==='custom'?'on':'')+'">กำหนดเอง</button>'
+    +     '<button data-m="day" class="'+(m==='day'?'on':'')+'">เทียบรายวัน</button>'
     +   '</div>'
     +   '<span class="hint">'+esc(modeLabel)+'</span>'
     + '</div>'
@@ -5201,6 +5885,891 @@ function bindCompare(){
   };
 }
 
+
+/* ============================================================================
+   เปรียบเทียบหลายมิติ (v3.9)
+   ทำไมรวมไว้ในการ์ดเดียวแล้วสลับมิติด้วยปุ่ม แทนการเพิ่มการ์ดทีละมิติ:
+   หน้าเดิมมีกราฟรายชั่วโมง + กราฟวันในสัปดาห์ + ตารางอีกสองตาราง
+   ถ้าเพิ่มอีก 5 มิติเป็นการ์ดแยก หน้าจะยาวกว่า 10 จอ และผู้ใช้เคยสะท้อนแล้วว่า
+   "ข้อมูลเยอะจนดูงง" — การ์ดเดียวที่สลับมิติได้ อ่านทีละคำถามได้ชัดกว่า
+============================================================================ */
+var CMP_DIMS = [
+  { k:'hour',    t:'รายชั่วโมง' },
+  { k:'band',    t:'ช่วงเวลาของวัน' },
+  { k:'dow',     t:'วันในสัปดาห์' },
+  { k:'daytype', t:'ประเภทวัน' },
+  { k:'floor',   t:'รายชั้น' },
+  { k:'vehicle', t:'ประเภทยานพาหนะ' },
+  { k:'ratio',   t:'ตัวชี้วัดเชิงสัดส่วน' }
+];
+/* ช่วงเวลาของวัน — แบ่งตามคอลัมน์ชั่วโมงในไฟล์ต้นทาง (PED_HOURS)
+   ใช้ "ค่าชั่วโมงของคอลัมน์" เป็นเกณฑ์ ไม่ใช่ลำดับคอลัมน์
+   เพราะถ้าวันหนึ่งไฟล์เพิ่มคอลัมน์ 09:00 เข้ามา ลำดับจะเลื่อนทั้งแถว */
+var DAY_BANDS = [
+  { t:'ช่วงเปิดห้าง – ก่อนเที่ยง', lo:0,  hi:11 },
+  { t:'ช่วงกลางวัน',              lo:12, hi:16 },
+  { t:'ช่วงเย็น (หลังเลิกงาน)',     lo:17, hi:19 },
+  { t:'ช่วงค่ำ – ปิดห้าง',          lo:20, hi:99 }
+];
+function bandLabel(b){
+  var hs = PED_HOURS.filter(function(h){ return h >= b.lo && h <= b.hi; });
+  if(!hs.length) return b.t;
+  return b.t + ' (' + hourLabel(hs[0]) + (hs.length > 1 ? '–' + hourLabel(hs[hs.length-1]) : '') + ')';
+}
+
+/* คืนแถวของมิติที่เลือก: [{ label, a, b, unit, dec }]
+   a/b เป็น "ค่าเฉลี่ยต่อวัน" เสมอ (ยกเว้นมิติสัดส่วน) เพราะจำนวนวันของสองช่วงไม่เท่ากัน
+   · null = ไม่มีข้อมูลของหมวดนั้นในช่วงนั้น (แสดงเป็นขีด ไม่ใช่ 0) */
+function cmpDimRows(dim, A, B){
+  function perDay(agg, v){ return agg.n > 0 && Number.isFinite(v) ? v / agg.n : null; }
+
+  if(dim === 'hour'){
+    return PED_HOURS.map(function(h, i){
+      return { label:hourLabel(h), a:perDay(A, A.ph[i]), b:perDay(B, B.ph[i]), unit:'คน' };
+    });
+  }
+  if(dim === 'band'){
+    return DAY_BANDS.map(function(bd){
+      var sa = 0, sb = 0, any = false;
+      PED_HOURS.forEach(function(h, i){
+        if(h >= bd.lo && h <= bd.hi){ any = true; sa += A.ph[i] || 0; sb += B.ph[i] || 0; }
+      });
+      return { label:bandLabel(bd), a:any ? perDay(A, sa) : null, b:any ? perDay(B, sb) : null, unit:'คน' };
+    }).filter(function(r){ return r.a !== null || r.b !== null; });
+  }
+  if(dim === 'dow'){
+    /* หารด้วย "จำนวนวันจันทร์ในช่วง" ไม่ใช่จำนวนวันทั้งช่วง — ไม่งั้นทุกแท่งจะต่ำกว่าจริง 7 เท่า */
+    return TH_DOW_FULL.map(function(nm, i){
+      function avgOf(agg){
+        var l = agg.byDow[i] || [];
+        return l.length ? sum(l.map(function(r){ return r.custIn; })) / l.length : null;
+      }
+      return { label:'วัน'+nm, a:avgOf(A), b:avgOf(B), unit:'คน' };
+    });
+  }
+  if(dim === 'daytype'){
+    var groups = [
+      { t:'วันธรรมดา (จ.–ศ. ไม่รวมวันหยุด)', f:function(r){ return r.dow <= 4 && !r.hol; } },
+      { t:'เสาร์–อาทิตย์',                   f:function(r){ return r.dow >= 5; } },
+      { t:'วันหยุดนักขัตฤกษ์',              f:function(r){ return !!r.hol; } }
+    ];
+    var out = [];
+    groups.forEach(function(g){
+      function avgOf(agg, key){
+        var l = agg.byDate.filter(g.f);
+        return l.length ? sum(l.map(function(r){ return r[key]; })) / l.length : null;
+      }
+      out.push({ label:g.t+' · ลูกค้าเข้า', a:avgOf(A,'custIn'), b:avgOf(B,'custIn'), unit:'คน' });
+      out.push({ label:g.t+' · รถยนต์เข้า', a:avgOf(A,'carIn'),  b:avgOf(B,'carIn'),  unit:'คัน' });
+    });
+    return out;
+  }
+  if(dim === 'floor'){
+    function byFloor(agg){
+      var m = Object.create(null);
+      Object.keys(agg.gateIn).forEach(function(k){
+        var g = agg.gateIn[k]; m[g.floor] = (m[g.floor] || 0) + (g.total || 0);
+      });
+      return m;
+    }
+    var fa = byFloor(A), fb = byFloor(B);
+    var keys = Object.keys(fa).concat(Object.keys(fb)).filter(function(k, i, arr){ return arr.indexOf(k) === i; });
+    /* เรียงชั้นตามลำดับจริงของอาคาร (B → 1 → 2 …) ไม่ใช่ตามตัวอักษร
+       'ไม่ระบุ' ไว้ท้ายสุด (floorRank ให้ 99) เพราะเป็นประตูที่อ่านชั้นจากชื่อไม่ออก */
+    /* ใช้ floorRank() ตัวเดียวกับหน้ารายประตู ลำดับชั้นทั้งแอปจึงตรงกัน */
+    keys.sort(function(x, y){ return floorRank(x) - floorRank(y) || (x < y ? -1 : 1); });
+    return keys.map(function(k){
+      return { label:(k === 'ไม่ระบุ' ? 'ไม่ระบุชั้น' : k),
+               a:k in fa ? perDay(A, fa[k]) : null, b:k in fb ? perDay(B, fb[k]) : null, unit:'คน' };
+    });
+  }
+  if(dim === 'vehicle'){
+    return [
+      { label:'รถยนต์เข้า (24 ชม.)',          a:perDay(A, A.carIn),   b:perDay(B, B.carIn),   unit:'คัน' },
+      { label:'รถยนต์เข้า (ช่วงห้างเปิด)',     a:perDay(A, A.carIn12), b:perDay(B, B.carIn12), unit:'คัน' },
+      { label:'รถยนต์ออก (24 ชม.)',          a:perDay(A, A.carOut),  b:perDay(B, B.carOut),  unit:'คัน' },
+      { label:'รถจักรยานยนต์',               a:perDay(A, A.moto),    b:perDay(B, B.moto),    unit:'ครั้ง' },
+      { label:'แท็กซี่',                      a:perDay(A, A.taxi),    b:perDay(B, B.taxi),    unit:'ครั้ง' },
+      { label:'เดลิเวอรี่',                    a:perDay(A, A.deli),    b:perDay(B, B.deli),    unit:'ครั้ง' }
+    ];
+  }
+  if(dim === 'ratio'){
+    function peak(agg){
+      var best = -1, bi = -1;
+      agg.ph.forEach(function(v, i){ if(v > best){ best = v; bi = i; } });
+      return best > 0 ? { h:PED_HOURS[bi], v:perDay(agg, best) } : null;
+    }
+    var pa = peak(A), pb = peak(B);
+    return [
+      { label:'ลูกค้าต่อรถยนต์ 1 คัน',                 a:safeDiv(A.custIn, A.carIn), b:safeDiv(B.custIn, B.carIn), unit:'คน/คัน', dec:1 },
+      { label:'สัดส่วนรถเข้าช่วงห้างเปิด ÷ 24 ชม.',       a:pctOf(A.carIn12, A.carIn),  b:pctOf(B.carIn12, B.carIn),  unit:'%', dec:1 },
+      { label:'ลูกค้าออก ÷ ลูกค้าเข้า',                 a:pctOf(A.custOut, A.custIn), b:pctOf(B.custOut, B.custIn), unit:'%', dec:1 },
+      { label:'ยอดชั่วโมงพีค (เฉลี่ย/วัน)' + (pa ? ' · '+esc(hourLabel(pa.h)) : '') + (pb && (!pa || pb.h !== pa.h) ? ' เทียบ '+esc(hourLabel(pb.h)) : ''),
+        a:pa ? pa.v : null, b:pb ? pb.v : null, unit:'คน', raw:true }
+    ];
+  }
+  return [];
+}
+
+function renderCmpDim(A, B, LB){
+  var host = $('cmpDimHost'); if(!host) return;
+  var dim = STATE.compare.dim || 'hour';
+  if(!CMP_DIMS.some(function(d){ return d.k === dim; })) dim = 'hour';
+  var rows = cmpDimRows(dim, A, B);
+
+  function f(v, r){ return v === null || !Number.isFinite(v) ? '—' : (r.dec ? fmt1(v) : fmt(v)); }
+  function diff(r){
+    if(r.a === null || r.b === null) return '—';
+    if(r.dec) return fmt1(Math.round((r.a - r.b)*10)/10);
+    var d = diffRounded(r.a, r.b); return d === null ? '—' : fmt(d);
+  }
+  /* สัดส่วน (%) ต้องเทียบเป็น "จุดเปอร์เซ็นต์" ไม่ใช่ % ของ % —
+     65% → 70% คือ +5 จุด ไม่ใช่ +7.7% ซึ่งผู้บริหารมักอ่านผิด */
+  function change(r){
+    if(r.unit === '%'){
+      if(r.a === null || r.b === null) return '<span class="chip chip-0">—</span>';
+      var pp = Math.round((r.a - r.b)*10)/10 + 0;
+      var cls = pp > 0.05 ? 'chip-up' : (pp < -0.05 ? 'chip-dn' : 'chip-0');
+      return '<span class="chip '+cls+'">'+(pp > 0 ? '+' : '')+fmt1(pp)+' จุด</span>';
+    }
+    return chipPct(pctChange(r.a, r.b));
+  }
+
+  var body = rows.length
+    ? '<div class="tbl-wrap"><table class="tbl" id="tblCmpDim"><thead><tr>'
+      + '<th class="no-sort">หมวด</th><th class="no-sort">'+esc(LB.a)+'</th><th class="no-sort">'+esc(LB.b)+'</th>'
+      + '<th class="no-sort">ผลต่าง</th><th class="no-sort">เปลี่ยนแปลง</th></tr></thead><tbody>'
+      + rows.map(function(r){
+          return '<tr><td>'+(r.raw ? r.label : esc(r.label))+' <span class="hint">('+esc(r.unit)+')</span></td>'
+            + '<td class="num">'+f(r.a, r)+'</td><td class="num">'+f(r.b, r)+'</td>'
+            + '<td class="num">'+diff(r)+'</td><td>'+change(r)+'</td></tr>';
+        }).join('')
+      + '</tbody></table></div>'
+    : emptyState('ไม่มีข้อมูลของมิตินี้', dim === 'floor'
+        ? 'ไฟล์ช่วงนี้ไม่มีตารางรายประตู จึงแยกยอดตามชั้นไม่ได้'
+        : 'ช่วงที่เลือกไม่มีข้อมูลสำหรับมิตินี้');
+
+  var chartable = rows.length && dim !== 'ratio';
+  host.innerHTML = card('เปรียบเทียบรายมิติ', 'ค่าเฉลี่ยต่อวัน · '+LB.a+' เทียบกับ '+LB.b,
+      '<div class="seg" id="cmpDimSeg" role="tablist" aria-label="เลือกมิติที่ต้องการเปรียบเทียบ" style="flex-wrap:wrap">'
+      + CMP_DIMS.map(function(d){
+          return '<button type="button" role="tab" data-d="'+d.k+'" aria-selected="'+(d.k===dim)+'" class="'+(d.k===dim?'on':'')+'">'+esc(d.t)+'</button>';
+        }).join('')
+      + '</div>'
+      + (chartable ? '<div class="mt-3">'+chartBox('chCmpDim', 300, 'กราฟเปรียบเทียบรายมิติของสองช่วงเวลา')+'</div>' : '')
+      + '<div class="mt-3">'+body+'</div>',
+      rows.length ? '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblCmpDim\',\'เปรียบเทียบรายมิติ\')">ส่งออก Excel</button>' : '');
+
+  if(chartable){
+    var isLine = (dim === 'hour');
+    /* หน่วยปนกันได้ในมิติประเภทวัน (คน + คัน) — ใส่หน่วยต่อแท่งไว้ในชื่อแถวแล้ว
+       ส่วนกราฟใช้หน่วยของแถวแรก tooltip จึงยังบอกหน่วยที่ถูกของมิตินั้น ๆ */
+    var unit = rows[0].unit;
+    function val(v){ return v === null ? null : Math.round(v); }
+    makeChart('chCmpDim', isLine ? 'line' : 'bar', {
+      labels: rows.map(function(r){ return r.label.replace(/ \(.*\)$/, ''); }),
+      datasets:[
+        isLine
+          ? { label:LB.a, unit:unit, data:rows.map(function(r){ return val(r.a); }),
+              borderColor:tone('blue'), backgroundColor:withAlpha(tone('blue'),.25), fill:true, tension:.34, borderWidth:2.9, pointRadius:2.4 }
+          : { label:LB.a, unit:unit, data:rows.map(function(r){ return val(r.a); }), backgroundColor:tone('blue'), borderRadius:6, maxBarThickness:34 },
+        isLine
+          ? { label:LB.b, unit:unit, data:rows.map(function(r){ return val(r.b); }),
+              borderColor:tone('gray'), backgroundColor:'transparent', borderDash:[5,4], tension:.34, borderWidth:2, pointRadius:2 }
+          : { label:LB.b, unit:unit, data:rows.map(function(r){ return val(r.b); }), backgroundColor:tone('gray'), borderRadius:6, maxBarThickness:34 }
+      ]
+    }, dim === 'daytype' ? { plugins:{ tooltip:{ callbacks:{ label:function(c){
+          var r = rows[c.dataIndex] || {};
+          return ' '+c.dataset.label+': '+fmt(c.parsed.y)+' '+(r.unit||'');
+        } } } } } : {});
+  }
+
+  var seg = $('cmpDimSeg');
+  if(seg) seg.querySelectorAll('button').forEach(function(b){
+    b.onclick = function(){ STATE.compare.dim = b.dataset.d; renderCmpDim(A, B, LB); };
+  });
+}
+
+/* ---- ตารางเทียบทุกฐานพร้อมกัน ----
+   ตอบคำถามผู้บริหารในตารางเดียว: "ช่วงนี้ดีขึ้นไหม เมื่อเทียบกับ
+   ช่วงก่อนหน้า / ปีก่อน / ค่าปกติย้อนหลัง 3 ช่วง" โดยไม่ต้องสลับโหมดไปมา
+   ฐาน "เฉลี่ย 3 ช่วงก่อนหน้า" ช่วยกันการสรุปผิดจากช่วงก่อนหน้าที่บังเอิญผิดปกติ
+   (เช่นเดือนก่อนมีวันหยุดยาว ทำให้เดือนนี้ดูตกทั้งที่จริงปกติ) */
+function cmpMultiBase(aFrom, aTo, A, pick, floor){
+  var len = daysBetween(aFrom, aTo) + 1;
+  var pr  = previousRange(aFrom, aTo) || { from:addDays(aFrom, -len), to:addDays(aFrom, -1) };
+  var bases = [
+    { t:'ช่วงก่อนหน้า', from:pr.from, to:pr.to },
+    { t:'ปีก่อน (52 สัปดาห์)', from:addDays(aFrom, -364), to:addDays(aTo, -364) }
+  ].map(function(b){
+    var ok = isIso(b.from) && isIso(b.to);
+    b.agg = ok ? aggregate(pick(b.from, b.to), floor) : { n:0 };
+    return b;
+  });
+  /* เฉลี่ย 3 ช่วงก่อนหน้า: ใช้เฉพาะช่วงที่มีข้อมูล และบอกจำนวนช่วงที่ใช้จริง */
+  var wins = [];
+  for(var k=1;k<=3;k++){
+    var wf = addDays(aFrom, -k*len), wt = addDays(aTo, -k*len);
+    if(!isIso(wf) || !isIso(wt)) continue;
+    var ag = aggregate(pick(wf, wt), floor);
+    if(ag.n > 0) wins.push(ag);
+  }
+  var METS = [
+    { k:'custIn',  t:'ลูกค้าเข้า',  u:'คน' },
+    { k:'custOut', t:'ลูกค้าออก',  u:'คน' },
+    { k:'carIn',   t:'รถยนต์เข้า',  u:'คัน' },
+    { k:'carOut',  t:'รถยนต์ออก',  u:'คัน' }
+  ];
+  function avgOf(agg, k){ return agg.n > 0 ? safeDiv(agg[k], agg.n) : null; }
+  function avg3(k){
+    if(!wins.length) return null;
+    return sum(wins.map(function(w){ return safeDiv(w[k], w.n); })) / wins.length;
+  }
+  var head = '<th class="no-sort">ตัวชี้วัด (เฉลี่ย/วัน)</th><th class="no-sort">ช่วงที่เลือก</th>'
+    + bases.map(function(b){
+        return '<th class="no-sort">'+esc(b.t)+'<div class="hint" style="font-weight:500">'
+             + (isIso(b.from) ? esc(thDate(b.from,'short')+'–'+thDate(b.to,'short')) : '—') + '</div></th>';
+      }).join('')
+    + '<th class="no-sort">เฉลี่ย 3 ช่วงก่อนหน้า<div class="hint" style="font-weight:500">ใช้จริง '+wins.length+' ช่วง</div></th>';
+  var body = METS.map(function(m){
+    var a = avgOf(A, m.k);
+    function cell(v){
+      return '<td class="num">'+(v===null?'—':fmt(v))+' '+(v===null?'':chipPct(pctChange(a, v)))+'</td>';
+    }
+    return '<tr><td>'+esc(m.t)+' <span class="hint">('+m.u+')</span></td><td class="num"><b>'+fmt(a)+'</b></td>'
+      + bases.map(function(b){ return cell(avgOf(b.agg, m.k)); }).join('')
+      + cell(avg3(m.k)) + '</tr>';
+  }).join('');
+  return card('เทียบทุกฐานพร้อมกัน', 'ตัวเลขในวงเล็บสีคือ % ที่ช่วงที่เลือกสูง/ต่ำกว่าฐานนั้น · คิดจากค่าเฉลี่ยต่อวัน',
+    '<div class="tbl-wrap"><table class="tbl" id="tblCmpMulti"><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>',
+    '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblCmpMulti\',\'เทียบทุกฐาน\')">ส่งออก Excel</button>');
+}
+
+/* ============================================================================
+   โหมด "เทียบรายวัน" (v3.8)
+
+   สิ่งที่ผู้ใช้ต้องการ: เลือกวันไหนก็ได้ (เช่น วันจันทร์) แล้วเทียบกับ
+   วันก่อนหน้า · วันเดียวกันสัปดาห์ก่อน · วันจันทร์เดียวกันของเดือนก่อน ·
+   วันจันทร์เดียวกันของปีก่อน โดยเลือกดูได้อิสระ
+
+   ทำไมฐานเทียบ "เดือนก่อน/ปีก่อน" ใช้การเลื่อนเป็นสัปดาห์ (−28 / −364)
+   ไม่ใช่ลบเดือนหรือลบปีตรง ๆ:
+     วันที่ 15 ส.ค. กับ 15 ก.ค. เป็นคนละวันในสัปดาห์ (เสาร์ กับ อังคาร)
+     ยอดลูกค้าวันเสาร์กับวันอังคารต่างกันเป็นเท่าตัว เทียบแล้วสรุปผิดทันที
+     การเลื่อน 4 สัปดาห์ / 52 สัปดาห์ ทำให้ "จันทร์เทียบจันทร์" เสมอ
+     ซึ่งตรงกับสิ่งที่ผู้ใช้พูดว่า "วันจันทร์เดือนที่แล้ว" จริง ๆ
+     (เป็นหลักเดียวกับที่โหมด YoY ของหน้านี้ใช้อยู่แล้ว)
+============================================================================ */
+
+/* ฐานเทียบมาตรฐาน — shift เป็นจำนวนวัน · null = ผู้ใช้เลือกวันเอง */
+var DAY_BASES = [
+  { k:'prev',  shift:-1,   short:'วันก่อนหน้า',        desc:'เทียบกับวันก่อนหน้า 1 วัน' },
+  { k:'week',  shift:-7,   short:'สัปดาห์ก่อน',        desc:'วันเดียวกันของสัปดาห์ก่อน (เลื่อน 7 วัน)' },
+  { k:'month', shift:-28,  short:'เดือนก่อน',          desc:'วันเดียวกันของเดือนก่อน (เลื่อน 4 สัปดาห์)' },
+  { k:'year',  shift:-364, short:'ปีก่อน',             desc:'วันเดียวกันของปีก่อน (เลื่อน 52 สัปดาห์)' },
+  { k:'own',   shift:null, short:'เลือกวันเอง',        desc:'เทียบกับวันที่ที่กำหนดเอง' }
+];
+function dayBaseOf(k){
+  for(var i=0;i<DAY_BASES.length;i++) if(DAY_BASES[i].k === k) return DAY_BASES[i];
+  return DAY_BASES[0];
+}
+/* ป้ายเต็มที่มีชื่อวันจริงอยู่ในนั้น เช่น "วันจันทร์ของเดือนก่อน"
+   ผู้ใช้อ่านหัวตารางแล้วรู้ทันทีว่ากำลังเทียบวันอะไรกับวันอะไร */
+function dayBaseLabel(b, iso){
+  if(b.shift === null) return 'วันที่เลือกเอง';
+  if(b.k === 'prev')   return 'วันก่อนหน้า';
+  var nm = isIso(iso) ? TH_DOW_FULL[dowOf(iso)] : '';
+  return nm ? ('วัน'+nm+'ของ'+b.short) : b.short;
+}
+
+/* ดัชนีวันแบบคีย์เป็น ISO — สร้างใหม่ทุกครั้งที่ข้อมูลเปลี่ยน ไม่แคชข้ามรอบ
+   ใช้ Object.create(null) เพราะคีย์มาจากข้อมูล ไม่ควรชนกับ prototype */
+function dayIndex(){
+  /* เทียบด้วย "ตัวอาร์เรย์เดียวกันหรือไม่" ไม่ใช่เทียบจำนวนวัน
+     เพราะโหลดข้อมูลใหม่แล้วบังเอิญได้จำนวนวันเท่าเดิม (กรณีปกติมาก เช่นโหลดซ้ำ)
+     ดัชนีเก่าจะถูกใช้ต่อ แล้วหน้าเทียบรายวันจะโชว์ตัวเลขของข้อมูลชุดก่อน */
+  if(DATA._dayIdx && DATA._dayIdxRef === DATA.days) return DATA._dayIdx;
+  var mp = Object.create(null);
+  DATA.days.forEach(function(d){ mp[d.d] = d; });
+  DATA._dayIdx = mp; DATA._dayIdxRef = DATA.days;
+  return mp;
+}
+/* ยอดของวันเดียว — คืน null ถ้าไม่มีวันนั้นในระบบ (ต่างจาก "มีวันนั้นแต่ยอดเป็น 0")
+   การแยกสองกรณีนี้สำคัญมาก: "ไม่มีข้อมูล" ต้องขึ้นขีด ไม่ใช่ขึ้นเลข 0
+   ซึ่งจะถูกอ่านว่าวันนั้นไม่มีลูกค้าเข้าศูนย์เลยแม้แต่คนเดียว */
+function dayAgg(iso, floorFilter){
+  if(!isIso(iso)) return null;
+  var rec = dayIndex()[iso];
+  /* (v3.9) วันที่เปิดแท็บไว้แต่ยังไม่คีย์ ถือว่า "ไม่มีข้อมูล" เช่นกัน
+     ไม่งั้นเลือกวันที่ 30 ของเดือนปัจจุบันแล้วจะเห็นยอด 0 คน พร้อม ▼ −100%
+     ซึ่งอ่านได้ว่าศูนย์ปิด ทั้งที่ความจริงคือยังไม่ถึงวันนั้น */
+  if(!rec || rec.blank) return null;
+  return aggregate([rec], floorFilter);
+}
+/* เหตุผลที่วันนั้นไม่มีตัวเลข — แยกให้ผู้ใช้รู้ว่าต้องไปแก้ที่ไหน */
+function dayMissingReason(iso){
+  if(!isIso(iso)) return 'วันที่ไม่ถูกต้อง';
+  var rec = dayIndex()[iso];
+  if(rec && rec.blank) return 'มีแท็บของวันนี้แล้ว แต่ยังไม่ได้คีย์ข้อมูล';
+  var r = DATA.days.length ? { a:DATA.days[0].d, b:DATA.days[DATA.days.length-1].d } : null;
+  if(r && (iso < r.a || iso > r.b)){
+    return 'อยู่นอกช่วงข้อมูลที่มีในระบบ (' + thDate(r.a,'medium') + ' – ' + thDate(r.b,'medium') + ')';
+  }
+  return 'ไม่มีแท็บของวันนี้ในไฟล์ข้อมูล';
+}
+
+/* วันตั้งต้นของโหมดนี้ — วันที่มีข้อมูลวันสุดท้ายในช่วงที่เลือก
+   ไม่ใช่ "วันนี้" เพราะข้อมูลมักตามหลังจริงอยู่ 1–2 วัน แล้วจะเปิดมาเจอหน้าว่าง */
+function defaultCompareDay(){
+  /* (v3.9) ต้องเป็นวันที่ "คีย์แล้ว" และไม่ล้ำวันนี้ — รุ่นก่อนเลือกวันสุดท้ายของช่วง
+     ซึ่งคือ 30 ก.ย. ที่ยังเป็นแท็บว่าง หน้าจึงเปิดมาเจอ "ไม่มีข้อมูล" ทุกครั้ง
+     กติกาเดียวกับ anchorDay() ที่ตัวเลือก "เดือนนี้" ใช้ */
+  var f = STATE.filter, best = '';
+  var todayIso = isoOf(new Date());
+  DATA.days.forEach(function(d){
+    if(d.blank || d.d > todayIso) return;
+    if(f.from && d.d < f.from) return;
+    if(f.to   && d.d > f.to)   return;
+    if(d.d > best) best = d.d;
+  });
+  return best || anchorDay();
+}
+
+function renderDayCompare(host){
+  var f = STATE.filter, ff = f.floor;
+
+  var day = isIso(STATE.compare.day) ? STATE.compare.day : defaultCompareDay();
+  STATE.compare.day = day;
+  if(!isIso(day)){
+    host.innerHTML = dayCompareControls('', 'prev', '')
+      + '<div class="mt-4">' + card('เทียบรายวัน','',
+          emptyState('ยังไม่มีวันที่ให้เทียบ','โหลดข้อมูลก่อน แล้วเลือกวันที่ที่ต้องการ')) + '</div>';
+    bindDayCompare(); return;
+  }
+
+  var base  = dayBaseOf(STATE.compare.dayBase);
+  var other = isIso(STATE.compare.dayOther) ? STATE.compare.dayOther : '';
+  var baseIso = base.shift === null ? other : addDays(day, base.shift);
+
+  host.innerHTML = dayCompareControls(day, base.k, other) + '<div id="dayCmpBody"></div>';
+  var body = $('dayCmpBody');
+
+  var A = dayAgg(day, ff);
+  if(!A){
+    body.innerHTML = '<div class="mt-4">' + card('เทียบรายวัน','',
+      emptyState('ไม่มีข้อมูลของวันที่เลือก',
+        thDateDow(day) + ' — ' + dayMissingReason(day) + ' · ลองเลือกวันอื่น หรือกดโหลดข้อมูลใหม่')) + '</div>';
+    bindDayCompare(); return;
+  }
+  if(base.shift === null && !isIso(other)){
+    body.innerHTML = '<div class="mt-4">' + card('เทียบรายวัน','',
+      emptyState('ยังไม่ได้เลือกวันที่จะนำมาเทียบ','เลือกวันในช่อง “วันที่นำมาเทียบ” ด้านบน')) + '</div>';
+    bindDayCompare(); return;
+  }
+
+  var B = dayAgg(baseIso, ff);
+  var METRICS = [
+    { k:'custIn',  label:'ลูกค้าเข้า',      unit:'คน',   grad:'g-indigo', icon:ICON.people },
+    { k:'custOut', label:'ลูกค้าออก',      unit:'คน',   grad:'g-teal',   icon:ICON.out },
+    { k:'carIn',   label:'รถยนต์เข้า',      unit:'คัน',  grad:'g-sky',    icon:ICON.car },
+    { k:'carOut',  label:'รถยนต์ออก',      unit:'คัน',  grad:'g-orange', icon:ICON.carOut }
+  ];
+  var baseName = dayBaseLabel(base, day);
+
+  /* ---- การ์ด KPI: ยอดของวันที่เลือก พร้อม % เทียบฐานที่เลือกอยู่ ---- */
+  var kpis = METRICS.map(function(m){
+    return kpiCard({ grad:m.grad, icon:m.icon, label:m.label, value:fmt(A[m.k]), unit:m.unit,
+      delta: B ? deltaText(pctChange(A[m.k], B[m.k]), 'เทียบ '+baseName)
+                : '<span class="kd-l">ไม่มีข้อมูล'+esc(baseName)+'</span>' });
+  }).join('');
+
+  /* ---- ตารางที่ 1: วันที่เลือก เทียบฐานที่เลือกอยู่ แบบละเอียดทุกตัวชี้วัด ---- */
+  var detRows = METRICS.concat([
+    { k:'moto', label:'รถจักรยานยนต์', unit:'ครั้ง' },
+    { k:'taxi', label:'แท็กซี่',        unit:'ครั้ง' },
+    { k:'deli', label:'เดลิเวอรี่',      unit:'ครั้ง' }
+  ]).map(function(m){
+    var a = A[m.k], b = B ? B[m.k] : null;
+    return '<tr><td>'+esc(m.label)+' <span class="hint">('+esc(m.unit)+')</span></td>'
+      + '<td class="num">'+fmt(a)+'</td>'
+      + '<td class="num">'+(B?fmt(b):'—')+'</td>'
+      + '<td class="num">'+(B && diffRounded(a,b)!==null ? fmt(diffRounded(a,b)) : '—')+'</td>'
+      + '<td>'+(B?chipPct(pctChange(a,b)):'<span class="chip chip-0">—</span>')+'</td></tr>';
+  }).join('');
+
+  var detBody = B
+    ? '<div class="tbl-wrap"><table class="tbl" id="tblDayDet"><thead><tr>'
+      + '<th class="no-sort">ตัวชี้วัด</th>'
+      + '<th class="no-sort">'+esc(thDateDow(day))+'</th>'
+      + '<th class="no-sort">'+esc(thDateDow(baseIso))+'</th>'
+      + '<th class="no-sort">ผลต่าง</th><th class="no-sort">เปลี่ยนแปลง</th>'
+      + '</tr></thead><tbody>'+detRows+'</tbody></table></div>'
+    : emptyState('ไม่มีข้อมูลของวันที่นำมาเทียบ',
+        (isIso(baseIso) ? thDateDow(baseIso)+' — ' : '') + dayMissingReason(baseIso) + ' · '
+        + 'ลองเปลี่ยนฐานเทียบ หรือเลือกวันเทียบเอง');
+
+  /* ---- ตารางที่ 2: เทียบครบทุกฐานพร้อมกันในตารางเดียว ----
+     ทำไมต้องมี: ผู้ใช้อยากรู้ว่า "วันจันทร์นี้" ดีขึ้นหรือแย่ลงเทียบกับอะไรบ้าง
+     ถ้าต้องกดสลับฐานทีละอันแล้วจำตัวเลขไว้ในหัว จะเทียบกันเองไม่ได้เลย */
+  var allRows = DAY_BASES.filter(function(x){ return x.shift !== null || isIso(other); })
+    .map(function(x){
+      var iso = x.shift === null ? other : addDays(day, x.shift);
+      var g = dayAgg(iso, ff);
+      var on = (x.k === base.k);
+      if(!g){
+        return '<tr'+(on?' style="background:var(--surface-2)"':'')+'>'
+          + '<td>'+esc(dayBaseLabel(x, day))+(on?' <span class="chip chip-w">กำลังดู</span>':'')+'</td>'
+          + '<td>'+(isIso(iso)?esc(thDateDow(iso)):'—')+'</td>'
+          + '<td class="num" colspan="4" style="color:var(--muted);text-align:left">ไม่มีข้อมูล — '+esc(dayMissingReason(iso))+'</td></tr>';
+      }
+      return '<tr'+(on?' style="background:var(--surface-2)"':'')+'>'
+        + '<td>'+esc(dayBaseLabel(x, day))+(on?' <span class="chip chip-w">กำลังดู</span>':'')+'</td>'
+        + '<td>'+esc(thDateDow(iso))+'</td>'
+        + '<td class="num">'+fmt(g.custIn)+'</td>'
+        + '<td>'+chipPct(pctChange(A.custIn, g.custIn))+'</td>'
+        + '<td class="num">'+fmt(g.carIn)+'</td>'
+        + '<td>'+chipPct(pctChange(A.carIn, g.carIn))+'</td></tr>';
+    }).join('');
+
+  body.innerHTML =
+      '<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4 mt-4">'+kpis+'</div>'
+
+    + '<div class="mt-4">'
+    + card('เทียบครบทุกฐานในตารางเดียว',
+        'ยอดของ '+thDateDow(day)+' เทียบกับทุกฐานพร้อมกัน · แถวที่ไฮไลต์คือฐานที่กำลังดูอยู่',
+        '<div class="tbl-wrap"><table class="tbl" id="tblDayAll"><thead><tr>'
+        + '<th class="no-sort">ฐานที่นำมาเทียบ</th><th class="no-sort">ตรงกับวันที่</th>'
+        + '<th class="no-sort">ลูกค้าเข้า (คน)</th><th class="no-sort">เทียบวันที่เลือก</th>'
+        + '<th class="no-sort">รถยนต์เข้า (คัน)</th><th class="no-sort">เทียบวันที่เลือก</th>'
+        + '</tr></thead><tbody>'+allRows+'</tbody></table></div>'
+        + '<div class="hint mt-3" style="line-height:1.7">ฐาน “เดือนก่อน” และ “ปีก่อน” เลื่อนเป็นจำนวนสัปดาห์ '
+        + '(4 และ 52 สัปดาห์) เพื่อให้ตรงวันในสัปดาห์เดียวกันเสมอ — ถ้าลบเดือน/ลบปีตรง ๆ '
+        + 'จะกลายเป็นเอาวันจันทร์ไปเทียบวันเสาร์ ซึ่งยอดต่างกันเป็นเท่าตัวโดยธรรมชาติ</div>',
+        '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblDayAll\',\'เทียบรายวันทุกฐาน\')">ส่งออก Excel</button>')
+    + '</div>'
+
+    + '<div class="mt-4">'
+    + card('รายละเอียดทุกตัวชี้วัด', thDateDow(day)+' เทียบกับ '+baseName, detBody,
+        B ? '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblDayDet\',\'เทียบรายวัน\')">ส่งออก Excel</button>' : '')
+    + '</div>'
+
+    + (B ? ('<div class="mt-4">'
+        + card('รูปแบบการเข้าศูนย์ตลอดวัน', 'ยอดลูกค้าเข้ารายชั่วโมงของสองวันที่นำมาเทียบ',
+            chartBox('chDayHour', 300, 'กราฟเส้นเทียบยอดลูกค้าเข้ารายชั่วโมงของสองวัน'))
+        + '</div>') : '');
+
+  if(B){
+    makeChart('chDayHour','line', {
+      labels: PED_HOURS.map(hourLabel),
+      datasets:[
+        { label:thDateDow(day), unit:'คน', data:A.ph.slice(),
+          borderColor:tone('blue'), backgroundColor:withAlpha(tone('blue'),.25),
+          fill:true, tension:.34, borderWidth:2.9, pointRadius:2.4 },
+        { label:thDateDow(baseIso), unit:'คน', data:B.ph.slice(),
+          borderColor:tone('gray'), backgroundColor:'transparent', borderDash:[5,4],
+          tension:.34, borderWidth:2, pointRadius:2 }
+      ]
+    }, {});
+  }
+  bindDayCompare();
+}
+
+function dayCompareControls(day, baseKey, other){
+  var b = dayBaseOf(baseKey);
+  var iso = b.shift === null ? other : (isIso(day) ? addDays(day, b.shift) : '');
+  /* จำกัดปฏิทินให้อยู่ในช่วงที่มีข้อมูลจริง — ผู้ใช้จะไม่เผลอเลือกปี 2030
+     แล้วนั่งงงว่าทำไมไม่มีตัวเลข (ยังพิมพ์เองได้ จึงยังต้องตรวจซ้ำตอนวาด) */
+  var rng = DATA.days.length
+    ? ' min="'+esc(DATA.days[0].d)+'" max="'+esc(DATA.days[DATA.days.length-1].d)+'"' : '';
+  return '<div class="card"><div class="card-b">'
+    + '<div class="seg" id="cmpMode">'
+    +   '<button data-m="mom">เทียบช่วงก่อนหน้า</button>'
+    +   '<button data-m="yoy">เทียบปีก่อน (YoY)</button>'
+    +   '<button data-m="custom">กำหนดเอง</button>'
+    +   '<button data-m="day" class="on">เทียบรายวัน</button>'
+    + '</div>'
+    + '<div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 pt-3 border-t" style="border-color:var(--line)">'
+    +   '<div><label class="lb" for="dayPick">วันที่ต้องการดู</label>'
+    +     '<input type="date" class="inp w-full" id="dayPick"'+rng+' value="'+esc(isIso(day)?day:'')+'"></div>'
+    +   '<div><label class="lb" for="dayBase">นำไปเทียบกับ</label>'
+    +     '<select class="inp w-full" id="dayBase">'
+    +       DAY_BASES.map(function(x){
+              return '<option value="'+esc(x.k)+'"'+(x.k===baseKey?' selected':'')+'>'
+                   + esc(dayBaseLabel(x, day)) + (x.shift===null?'':' — '+esc(x.desc)) + '</option>';
+            }).join('')
+    +     '</select></div>'
+    +   '<div><label class="lb" for="dayOther">วันที่นำมาเทียบ</label>'
+    +     '<input type="date" class="inp w-full" id="dayOther"'+rng
+    +       (b.shift === null ? '' : ' disabled')
+    +       ' value="'+esc(isIso(iso)?iso:'')+'"></div>'
+    + '</div>'
+    + '<div class="flex flex-wrap gap-4 mt-3 pt-3 border-t text-[12.5px]" style="border-color:var(--line)">'
+    +   '<div><span style="color:var(--muted)">วันที่เลือก:</span> <b>'+(isIso(day)?esc(thDateDow(day)):'—')+'</b></div>'
+    +   '<div><span style="color:var(--muted)">นำไปเทียบกับ:</span> <b>'+(isIso(iso)?esc(thDateDow(iso)):'—')+'</b></div>'
+    +   '<div class="hint">โหมดนี้ดูได้ทุกวันในระบบ ไม่จำกัดตามช่วงวันที่ในตัวกรอง</div>'
+    + '</div>'
+    + '</div></div>';
+}
+
+function bindDayCompare(){
+  var seg = $('cmpMode');
+  if(seg) seg.querySelectorAll('button').forEach(function(b){
+    b.onclick = function(){ STATE.compare.mode = b.dataset.m; renderCompare(); };
+  });
+  var pick = $('dayPick');
+  if(pick) pick.onchange = function(){
+    if(!isIso(pick.value)){ toast('กรุณาเลือกวันที่ให้ถูกต้อง','err'); return; }
+    STATE.compare.day = pick.value; renderCompare();
+  };
+  var sel = $('dayBase');
+  if(sel) sel.onchange = function(){ STATE.compare.dayBase = sel.value; renderCompare(); };
+  var oth = $('dayOther');
+  if(oth) oth.onchange = function(){
+    if(!isIso(oth.value)){ toast('กรุณาเลือกวันที่ให้ถูกต้อง','err'); return; }
+    /* แก้ช่องนี้เมื่อไหร่ ให้ถือว่าผู้ใช้ตั้งใจเลือกวันเทียบเอง จึงสลับฐานให้อัตโนมัติ
+       ไม่งั้นค่าที่พิมพ์จะถูกเขียนทับทันทีที่วาดใหม่ แล้วดูเหมือนช่องกรอกไม่ทำงาน */
+    STATE.compare.dayOther = oth.value;
+    STATE.compare.dayBase  = 'own';
+    renderCompare();
+  };
+}
+/* ============================================================================
+   ส่วนที่ 20ค · หน้า "สถิติเชิงลึก" (v3.7)
+   ทำไมต้องมีหน้านี้แยก: หน้าอื่นตอบว่า "ยอดเท่าไหร่" แต่ไม่ตอบว่า
+   "ยอดนั้นนิ่งหรือแกว่ง" และ "ลูกค้ากับรถยนต์ไปด้วยกันแค่ไหน"
+   ซึ่งเป็นสิ่งที่ต้องใช้ตอนวางกำลังคนและวางแผนที่จอดรถ
+   จึงรวมค่า SD / CV / สหสัมพันธ์ (r) และการจับคู่กลุ่มวันเองไว้ที่เดียว
+============================================================================ */
+
+var STAT_METRICS = [
+  { k:'custIn',  label:'ลูกค้าเข้า',  unit:'คน',  grad:'g-indigo', ic:'people', grp:'cust' },
+  { k:'custOut', label:'ลูกค้าออก',  unit:'คน',  grad:'g-teal',   ic:'out',    grp:'cust' },
+  { k:'carIn',   label:'รถยนต์เข้า',  unit:'คัน', grad:'g-sky',    ic:'car',    grp:'car'  },
+  { k:'carOut',  label:'รถยนต์ออก',  unit:'คัน', grad:'g-orange', ic:'carOut', grp:'car'  }
+];
+
+/* ยอดรายวันของตัวชี้วัดหนึ่งตัว โดยเคารพตัวกรอง "ชั้น" เหมือนหน้าอื่นทุกหน้า
+   ทำไมต้องแยกฟังก์ชัน: aggregate() คืนแต่ยอดรวมของทั้งช่วง ใช้หา SD ไม่ได้
+   เพราะ SD ต้องใช้ค่ารายวันทีละวัน จึงต้องดึงค่าต่อวันด้วยกติกาเดียวกัน
+   ไม่งั้นตัวเลขในหน้านี้จะไม่ตรงกับหน้าอื่นเมื่อผู้ใช้กรองชั้น */
+function statDayVal(d, key, floorFilter){
+  var byFloor = !!(floorFilter && floorFilter !== 'all');
+  if(key === 'custIn')  return byFloor ? sumGatesByFloor(d,'pk','pi','pn',   floorFilter) : d.s.custIn;
+  if(key === 'custOut') return byFloor ? sumGatesByFloor(d,'pok','po','pno', floorFilter) : d.s.custOut;
+  /* ช่องทางรถยนต์ไม่มีข้อมูล "ชั้น" ในไฟล์ต้นทาง จึงเป็นยอดทั้งศูนย์เสมอ
+     (จุดเดียวกับที่ aggregate() หมายเหตุไว้เรื่องอัตราส่วนคนต่อคัน) */
+  var v = d.s[key];
+  return Number.isFinite(v) ? v : null;
+}
+function statSeries(days, key, floorFilter){
+  return days.map(function(d){ return { d:d.d, v:statDayVal(d, key, floorFilter) }; });
+}
+function statVals(rows){ return rows.map(function(r){ return r.v; }); }
+
+/* ค่า r แสดงทศนิยม 3 ตำแหน่ง — ทศนิยม 1 ตำแหน่งหยาบเกินไปสำหรับค่าที่อยู่ในช่วง −1..1 */
+function fmtR(r){
+  if(r === null || !Number.isFinite(r)) return '—';
+  return (Math.round(r*1000)/1000).toLocaleString('th-TH',
+    { minimumFractionDigits:3, maximumFractionDigits:3 });
+}
+function fmtSd(v, unit){
+  return v === null || !Number.isFinite(v) ? '—' : '± ' + fmt(v) + (unit ? ' ' + unit : '');
+}
+/* ป้ายบอกความสม่ำเสมอจากค่า CV — ผู้ใช้ไม่ต้องจำว่า CV เท่าไหร่ถึงเรียกว่าแกว่ง
+   เกณฑ์ 10/20/30% เป็นเกณฑ์ที่ใช้กันทั่วไปในงานวิเคราะห์เชิงปฏิบัติการ */
+function cvLabel(cv){
+  if(cv === null || !Number.isFinite(cv)) return { text:'—', cls:'chip-0' };
+  if(cv < 10) return { text:'สม่ำเสมอมาก',   cls:'chip-up' };
+  if(cv < 20) return { text:'ค่อนข้างสม่ำเสมอ', cls:'chip-up' };
+  if(cv < 30) return { text:'แกว่งปานกลาง',   cls:'chip-w'  };
+  return { text:'แกว่งสูง', cls:'chip-dn' };
+}
+
+/* ยอดรายเดือนของทั้งฐานข้อมูล (ไม่ผูกช่วงวันที่ในตัวกรอง)
+   ทำไมไม่ใช้ filteredDays(): ค่าเริ่มต้นของตัวกรองคือ "เดือนนี้" ซึ่งมีเดือนเดียว
+   คำนวณ MoM/YoY ไม่ได้เลย จึงต้องมองข้อมูลทุกเดือนแล้วค่อยเลือกเดือนเป้าหมาย
+   แต่ยังเคารพตัวกรองประเภทวันและการตัดวันว่าง เพื่อให้ฐานการเทียบเป็นชุดเดียวกัน */
+function statMonthMap(floorFilter){
+  var f = STATE.filter, mp = Object.create(null);
+  DATA.days.forEach(function(d){
+    if(!dayTypeMatch(d, f.dayType)) return;
+    /* (v3.9) วันว่างตัดเสมอ — ไม่งั้นเดือนปัจจุบันที่เปิดแท็บล่วงหน้าไว้ทั้งเดือน
+       จะมีค่าเฉลี่ยต่อวันต่ำเกินจริง แล้ว MoM ติดลบหนักทั้งที่ยอดจริงปกติ */
+    if(d.blank) return;
+    var m = mp[d.ym] || (mp[d.ym] = { ym:d.ym, n:0, custIn:0, carIn:0 });
+    var c = statDayVal(d,'custIn',floorFilter), v = statDayVal(d,'carIn',floorFilter);
+    m.n++;
+    if(Number.isFinite(c)) m.custIn += c;
+    if(Number.isFinite(v)) m.carIn  += v;
+  });
+  return mp;
+}
+/* เลื่อนเดือนแบบปลอดภัย — ไม่ใช้ Date object เพราะ new Date('2026-08') ตีความ
+   เป็น UTC แล้วเขตเวลาไทย (+7) อาจดึงกลับไปเป็นเดือนก่อนหน้าในบางเครื่อง */
+function shiftYm(ym, deltaMonths){
+  var p = String(ym).split('-');
+  var y = +p[0], m = +p[1];
+  if(!(y > 1900) || !(m >= 1 && m <= 12)) return null;
+  var t = y*12 + (m-1) + deltaMonths;
+  if(t < 0) return null;
+  return Math.floor(t/12) + '-' + String(t%12 + 1).padStart(2,'0');
+}
+
+function statSelect(id, val){
+  return '<select class="inp w-full" id="'+id+'">'
+    + STAT_GROUPS.map(function(g){
+        return '<option value="'+esc(g.k)+'"'+(g.k === val ? ' selected' : '')+'>'+esc(g.label)+'</option>';
+      }).join('')
+    + '</select>';
+}
+function statControls(nA, nB){
+  var gA = statGroupOf(STATE.statA), gB = statGroupOf(STATE.statB);
+  return '<div class="card"><div class="card-b">'
+    + '<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">'
+    +   '<div><label class="lb" for="statA">กลุ่มวันที่ 1</label>'+statSelect('statA', STATE.statA)+'</div>'
+    +   '<div><label class="lb" for="statB">กลุ่มวันที่ 2 (ใช้เทียบ)</label>'+statSelect('statB', STATE.statB)+'</div>'
+    +   '<div class="flex items-end"><button class="btn btn-sm" id="statPreset">จันทร์–ศุกร์ เทียบ เสาร์–อาทิตย์</button></div>'
+    +   '<div class="flex items-end"><button class="btn btn-sm" id="statSwap">สลับสองกลุ่ม</button></div>'
+    + '</div>'
+    + '<div class="flex flex-wrap gap-4 mt-3 pt-3 border-t text-[12.5px]" style="border-color:var(--line)">'
+    +   '<div><span style="color:var(--muted)">กลุ่มที่ 1:</span> <b>'+esc(gA.label)+'</b> ('+fmt(nA)+' วัน)</div>'
+    +   '<div><span style="color:var(--muted)">กลุ่มที่ 2:</span> <b>'+esc(gB.label)+'</b> ('+fmt(nB)+' วัน)</div>'
+    +   '<div class="hint">ทั้งสองกลุ่มคัดจากช่วงวันที่และตัวกรองด้านบนเสมอ</div>'
+    + '</div>'
+    + '</div></div>';
+}
+function bindStats(){
+  var a = $('statA'), b = $('statB'), p = $('statPreset'), s = $('statSwap');
+  if(a) a.onchange = function(){ STATE.statA = a.value; renderStats(); };
+  if(b) b.onchange = function(){ STATE.statB = b.value; renderStats(); };
+  if(p) p.onclick  = function(){ STATE.statA = 'wd'; STATE.statB = 'we'; renderStats(); };
+  if(s) s.onclick  = function(){
+    var t = STATE.statA; STATE.statA = STATE.statB; STATE.statB = t; renderStats();
+  };
+}
+
+function renderStats(){
+  var host = $('v-stats'); if(!host) return;
+  if(!DATA.days.length){
+    host.innerHTML = card('สถิติเชิงลึก','', emptyState('ยังไม่มีข้อมูล','โหลดข้อมูลจากหน้าตั้งค่าก่อน'));
+    return;
+  }
+  var f = STATE.filter, ff = f.floor;
+  /* (v3.9) ตัดวันที่ยังไม่คีย์ข้อมูลออกเสมอ ไม่ว่าตัวกรองจะตั้งไว้อย่างไร
+     หน้าอื่นยอมให้ผู้ใช้ดูวันว่างได้ (เช่นตารางรายวัน) แต่ในงานสถิติ วันว่างคือ
+     "ไม่มีข้อมูล" ไม่ใช่ "ลูกค้า 0 คน" — ถ้านับรวม ค่าต่ำสุดจะเป็น 0
+     SD และ CV จะพองเกินจริงหลายเท่า และค่า r จะสูงปลอม ๆ จากจุด (0,0) */
+  var days = filteredDays().filter(function(d){ return !d.blank; });
+  if(!days.length){
+    host.innerHTML = statControls(0,0)
+      + '<div class="mt-4">' + card('สถิติเชิงลึก','',
+          emptyState('ไม่มีข้อมูลในช่วงที่เลือก','ลองขยายช่วงวันที่ หรือปิดตัวกรองประเภทวัน')) + '</div>';
+    bindStats();
+    return;
+  }
+
+  /* ---- ชุดข้อมูลรายวันและค่าสถิติของทั้งช่วง ---- */
+  var ser = {}, st = {};
+  STAT_METRICS.forEach(function(m){
+    ser[m.k] = statSeries(days, m.k, ff);
+    st[m.k]  = statsOf(ser[m.k]);
+  });
+
+  var rCC   = pearson(statVals(ser.custIn), statVals(ser.carIn));
+  var rLab  = corrLabel(rCC);
+  var ratio = safeDiv(st.custIn.total, st.carIn.total);
+
+  /* ---- การ์ด KPI ---- */
+  var cvC = cvLabel(st.custIn.cv), cvV = cvLabel(st.carIn.cv);
+  var kpis =
+      kpiCard({ grad:'g-indigo', icon:ICON.people, label:'ลูกค้าเข้า เฉลี่ย/วัน',
+                value:fmt(st.custIn.mean), unit:'คน',
+                sub:'SD '+fmtSd(st.custIn.sd,'คน')+' · CV '+(st.custIn.cv===null?'—':fmt1(st.custIn.cv)+'%')+' · '+cvC.text })
+    + kpiCard({ grad:'g-sky', icon:ICON.car, label:'รถยนต์เข้า เฉลี่ย/วัน',
+                value:fmt(st.carIn.mean), unit:'คัน',
+                sub:'SD '+fmtSd(st.carIn.sd,'คัน')+' · CV '+(st.carIn.cv===null?'—':fmt1(st.carIn.cv)+'%')+' · '+cvV.text })
+    + kpiCard({ grad:'g-amber', icon:ICON.ratio, label:'ลูกค้าต่อรถยนต์ 1 คัน',
+                value:(ratio===null?'—':fmt1(ratio)), unit:'คน/คัน',
+                sub:'จากยอดรวม '+fmt(st.custIn.total)+' คน ÷ '+fmt(st.carIn.total)+' คัน' })
+    + kpiCard({ grad:'g-violet', icon:ICON.peak, label:'สหสัมพันธ์ ลูกค้า–รถยนต์ (r)',
+                value:fmtR(rCC), unit:'',
+                sub:'ความสอดคล้อง'+rLab.text+' · จาก '+fmt(st.custIn.n)+' วัน' });
+
+  /* ---- ตารางสถิติเต็ม ---- */
+  var stRows = STAT_METRICS.map(function(m){
+    var s = st[m.k], cv = cvLabel(s.cv);
+    return '<tr><td>'+esc(m.label)+' <span class="hint">('+esc(m.unit)+')</span></td>'
+      + '<td class="num">'+fmt(s.n)+'</td>'
+      + '<td class="num">'+fmt(s.total)+'</td>'
+      + '<td class="num">'+fmt(s.mean)+'</td>'
+      + '<td class="num">'+fmt(s.median)+'</td>'
+      + '<td class="num">'+(s.sd===null?'—':fmt(s.sd))+'</td>'
+      + '<td class="num">'+(s.cv===null?'—':fmt1(s.cv)+'%')+' <span class="chip '+cv.cls+'">'+esc(cv.text)+'</span></td>'
+      + '<td class="num">'+fmt(s.max)+(s.maxDate?'<div class="hint">'+esc(thDateDow(s.maxDate))+'</div>':'')+'</td>'
+      + '<td class="num">'+fmt(s.min)+(s.minDate?'<div class="hint">'+esc(thDateDow(s.minDate))+'</div>':'')+'</td></tr>';
+  }).join('');
+
+  /* ---- เทียบสองกลุ่มวันที่ผู้ใช้เลือกเอง ---- */
+  var gA = statGroupOf(STATE.statA), gB = statGroupOf(STATE.statB);
+  var dA = days.filter(function(d){ return gA.test(d); });
+  var dB = days.filter(function(d){ return gB.test(d); });
+
+  var pairRows = '', chCust = { a:[], b:[] }, chCar = { a:[], b:[] };
+  STAT_METRICS.forEach(function(m){
+    var sa = statsOf(statSeries(dA, m.k, ff));
+    var sb = statsOf(statSeries(dB, m.k, ff));
+    var p  = pctChange(sa.mean, sb.mean);
+    (m.grp === 'cust' ? chCust : chCar).a.push(sa.mean === null ? null : Math.round(sa.mean));
+    (m.grp === 'cust' ? chCust : chCar).b.push(sb.mean === null ? null : Math.round(sb.mean));
+    pairRows += '<tr><td>'+esc(m.label)+' <span class="hint">('+esc(m.unit)+')</span></td>'
+      + '<td class="num">'+fmt(sa.mean)+'</td>'
+      + '<td class="num">'+fmt(sb.mean)+'</td>'
+      + '<td class="num">'+(diffRounded(sa.mean, sb.mean)===null?'—':fmt(diffRounded(sa.mean, sb.mean)))+'</td>'
+      + '<td>'+chipPct(p)+'</td>'
+      + '<td class="num">'+(sa.sd===null?'—':fmt(sa.sd))+'</td>'
+      + '<td class="num">'+(sb.sd===null?'—':fmt(sb.sd))+'</td></tr>';
+  });
+
+  var pairBody = (!dA.length || !dB.length)
+    ? emptyState('เทียบสองกลุ่มไม่ได้',
+        'กลุ่มที่ 1 มี '+fmt(dA.length)+' วัน · กลุ่มที่ 2 มี '+fmt(dB.length)+' วัน — '
+        + 'ต้องมีข้อมูลอย่างน้อยกลุ่มละ 1 วัน ลองขยายช่วงวันที่หรือเลือกกลุ่มวันใหม่')
+    : '<div class="tbl-wrap"><table class="tbl" id="tblStatPair"><thead><tr>'
+      + '<th class="no-sort">ตัวชี้วัด</th>'
+      + '<th class="no-sort">เฉลี่ย/วัน · '+esc(gA.label)+'</th>'
+      + '<th class="no-sort">เฉลี่ย/วัน · '+esc(gB.label)+'</th>'
+      + '<th class="no-sort">ผลต่าง/วัน</th><th class="no-sort">ส่วนต่าง %</th>'
+      + '<th class="no-sort">SD กลุ่ม 1</th><th class="no-sort">SD กลุ่ม 2</th>'
+      + '</tr></thead><tbody>'+pairRows+'</tbody></table></div>';
+
+  /* ---- MoM / YoY ของเดือนล่าสุดในช่วงที่เลือก ---- */
+  var mm = statMonthMap(ff);
+  var curYm = days[days.length-1].ym;
+  days.forEach(function(d){ if(d.ym > curYm) curYm = d.ym; });
+  var pYm = shiftYm(curYm, -1), yYm = shiftYm(curYm, -12);
+  function mAvg(ym, key){ var r = ym && mm[ym]; return r ? safeDiv(r[key], r.n) : null; }
+  var growRows = [
+    { k:'custIn', label:'ลูกค้าเข้า', unit:'คน' },
+    { k:'carIn',  label:'รถยนต์เข้า', unit:'คัน' }
+  ].map(function(m){
+    var c = mAvg(curYm,m.k), p = mAvg(pYm,m.k), y = mAvg(yYm,m.k);
+    return '<tr><td>'+esc(m.label)+' <span class="hint">('+esc(m.unit)+'/วัน)</span></td>'
+      + '<td class="num">'+fmt(c)+'</td>'
+      + '<td class="num">'+fmt(p)+'</td><td>'+chipPct(pctChange(c,p))+'</td>'
+      + '<td class="num">'+fmt(y)+'</td><td>'+chipPct(pctChange(c,y))+'</td></tr>';
+  }).join('');
+
+  /* ---- ประกอบหน้า ---- */
+  host.innerHTML = statControls(dA.length, dB.length)
+    + '<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4 mt-4">'+kpis+'</div>'
+
+    + '<div class="mt-4">'
+    + card('ตารางสถิติรายตัวชี้วัด',
+        'ช่วง '+thDate(days[0].d,'medium')+' – '+thDate(days[days.length-1].d,'medium')+' · '+fmt(days.length)+' วัน · SD คำนวณแบบกลุ่มตัวอย่าง (หาร n−1)',
+        '<div class="tbl-wrap"><table class="tbl" id="tblStatAll"><thead><tr>'
+        + '<th class="no-sort">ตัวชี้วัด</th><th class="no-sort">จำนวนวัน</th><th class="no-sort">ยอดรวม</th>'
+        + '<th class="no-sort">ค่าเฉลี่ย/วัน</th><th class="no-sort">มัธยฐาน</th><th class="no-sort">SD</th>'
+        + '<th class="no-sort">CV (ความผันผวน)</th><th class="no-sort">สูงสุด</th><th class="no-sort">ต่ำสุด</th>'
+        + '</tr></thead><tbody>'+stRows+'</tbody></table></div>',
+        '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblStatAll\',\'สถิติรายตัวชี้วัด\')">ส่งออก Excel</button>')
+    + '</div>'
+
+    + '<div class="mt-4">'
+    + card('เปรียบเทียบกลุ่มวันที่เลือกเอง', gA.label+' เทียบกับ '+gB.label, pairBody,
+        (dA.length && dB.length)
+          ? '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblStatPair\',\'เทียบกลุ่มวัน\')">ส่งออก Excel</button>' : '')
+    + '</div>'
+
+    + '<div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">'
+    + card('เทียบยอดลูกค้าสองกลุ่มวัน', 'ค่าเฉลี่ยต่อวัน (คน)', chartBox('chStatCust', 280))
+    + card('เทียบยอดรถยนต์สองกลุ่มวัน', 'ค่าเฉลี่ยต่อวัน (คัน)', chartBox('chStatCar', 280))
+    + '</div>'
+
+    + '<div class="mt-4">'
+    + card('ความสัมพันธ์ ลูกค้าเข้า กับ รถยนต์เข้า',
+        'แต่ละจุดคือหนึ่งวันในช่วงที่เลือก · ค่า r = '+fmtR(rCC)+' ('+rLab.text+')',
+        chartBox('chStatScatter', 320, 'แผนภาพกระจายแสดงยอดลูกค้าเข้าเทียบกับยอดรถยนต์เข้าในแต่ละวัน')
+        + '<div class="hint mt-3" style="line-height:1.7">'
+        + esc(statCorrNote(rCC, st.custIn.n))
+        + '</div>')
+    + '</div>'
+
+    + '<div class="mt-4">'
+    + card('อัตราเติบโตรายเดือน (MoM) และเทียบปีก่อน (YoY)',
+        'เดือนเป้าหมาย '+thMonth(curYm)+' · คิดจากค่าเฉลี่ยต่อวันเพื่อไม่ให้จำนวนวันในเดือนบิดผล',
+        '<div class="tbl-wrap"><table class="tbl" id="tblStatGrow"><thead><tr>'
+        + '<th class="no-sort">ตัวชี้วัด</th><th class="no-sort">'+esc(thMonthShort(curYm))+'</th>'
+        + '<th class="no-sort">'+esc(pYm?thMonthShort(pYm):'เดือนก่อน')+'</th><th class="no-sort">MoM</th>'
+        + '<th class="no-sort">'+esc(yYm?thMonthShort(yYm):'ปีก่อน')+'</th><th class="no-sort">YoY</th>'
+        + '</tr></thead><tbody>'+growRows+'</tbody></table></div>'
+        + '<div class="hint mt-3">ต้องการภาพรายเดือนแบบเต็ม เลือกแท็บ “ภาพรายเดือน / รายปี” ด้านบนได้</div>',
+        '<button class="btn btn-sm" onclick="exportTableXlsx(\'tblStatGrow\',\'อัตราเติบโต\')">ส่งออก Excel</button>')
+    + '</div>';
+
+  /* ---- กราฟ ---- */
+  var custLabels = ['ลูกค้าเข้า','ลูกค้าออก'], carLabels = ['รถยนต์เข้า','รถยนต์ออก'];
+  makeChart('chStatCust','bar', {
+    labels: custLabels,
+    datasets:[
+      { label:gA.label, unit:'คน', data:chCust.a, backgroundColor:mcol('custIn'),  borderRadius:6, maxBarThickness:52 },
+      { label:gB.label, unit:'คน', data:chCust.b, backgroundColor:mcol('custOut'), borderRadius:6, maxBarThickness:52 }
+    ]
+  }, {});
+  makeChart('chStatCar','bar', {
+    labels: carLabels,
+    datasets:[
+      { label:gA.label, unit:'คัน', data:chCar.a, backgroundColor:mcol('carIn'),  borderRadius:6, maxBarThickness:52 },
+      { label:gB.label, unit:'คัน', data:chCar.b, backgroundColor:mcol('carOut'), borderRadius:6, maxBarThickness:52 }
+    ]
+  }, {});
+
+  /* จุดที่ค่าใดค่าหนึ่งหายไป ต้องไม่ถูกวาด ไม่ใช่วาดที่ 0
+     เพราะจุดที่ (0, 40000) จะดึงเส้นแนวโน้มในสายตาคนอ่านให้เพี้ยนไปทั้งภาพ */
+  var pts = [];
+  for(var i=0;i<ser.custIn.length;i++){
+    var cx = ser.carIn[i].v, cy = ser.custIn[i].v;
+    if(Number.isFinite(cx) && Number.isFinite(cy)) pts.push({ x:cx, y:cy, d:ser.custIn[i].d });
+  }
+  makeChart('chStatScatter','scatter', {
+    datasets:[{ label:'รายวัน', data:pts, unit:'คน',
+                backgroundColor:withAlpha(mcol('custIn'), .55),
+                borderColor:mcol('custIn'), pointRadius:4, pointHoverRadius:6 }]
+  }, {
+    /* แผนภาพกระจายต้องชี้ทีละจุด ไม่ใช่โหมด index ซึ่งออกแบบมาสำหรับกราฟที่มีแกน x ร่วมกัน */
+    interaction:{ mode:'nearest', intersect:true },
+    plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:function(c){
+      var r = c.raw || {};
+      return ' ' + (r.d ? thDateDow(r.d) + ' · ' : '')
+           + 'รถยนต์ ' + fmt(r.x) + ' คัน · ลูกค้า ' + fmt(r.y) + ' คน';
+    } } } },
+    scales:{
+      x:{ type:'linear', beginAtZero:false, title:{ display:true, text:'รถยนต์เข้า (คัน)' },
+          ticks:{ callback:function(v){ return fmt(v); } } },
+      y:{ beginAtZero:false, title:{ display:true, text:'ลูกค้าเข้า (คน)' } }
+    }
+  });
+
+  bindStats();
+}
+
+/* คำอธิบายค่า r เป็นภาษาคน พร้อมข้อควรระวังที่ต้องเตือนทุกครั้ง
+   ทำไมต้องเตือน: ค่า r ระดับวันมักสูงอยู่แล้วเพราะทั้งสองตัวเลขขึ้นกับ
+   "วันนั้นคนเยอะไหม" เหมือนกัน — ไม่ได้แปลว่ารถทำให้คนมา */
+function statCorrNote(r, n){
+  if(r === null || !Number.isFinite(r)){
+    return 'ข้อมูลยังไม่พอคำนวณค่าสหสัมพันธ์ (ต้องมีอย่างน้อย 3 วันที่มีทั้งยอดลูกค้าและยอดรถยนต์ '
+         + 'และค่าต้องไม่คงที่เท่ากันทุกวัน) ขณะนี้มีข้อมูล ' + fmt(n) + ' วัน';
+  }
+  var a = Math.abs(r);
+  var head = a >= 0.7
+    ? 'ยอดลูกค้ากับยอดรถยนต์เคลื่อนไหวไปในทางเดียวกันค่อนข้างชัด'
+    : (a >= 0.3 ? 'ยอดลูกค้ากับยอดรถยนต์เคลื่อนไหวสอดคล้องกันบ้าง แต่ไม่มาก'
+                : 'ยอดลูกค้ากับยอดรถยนต์แทบไม่สัมพันธ์กันในช่วงนี้');
+  var dir = r < 0 ? ' และเป็นไปในทิศทางตรงข้ามกัน (วันที่รถมาก ลูกค้ากลับน้อย) ซึ่งผิดปกติ ควรตรวจสอบข้อมูลต้นทาง' : '';
+  return head + dir + ' · ค่า r = ' + fmtR(r) + ' จากข้อมูล ' + fmt(n) + ' วัน '
+       + '· ข้อควรระวัง: ค่าสหสัมพันธ์บอกแค่ว่าตัวเลขสองชุดขึ้นลงพร้อมกันหรือไม่ '
+       + 'ไม่ได้แปลว่าอย่างหนึ่งเป็นสาเหตุของอีกอย่าง';
+}
 
 /* ============================================================================
    ส่วนที่ 21 · หน้า "พยากรณ์ & ผิดปกติ"
@@ -6279,7 +7848,18 @@ function bindGateMergePanel(){
 function renderQuality(){
   var host = $('v-quality');
   if(!DATA.days.length){ host.innerHTML = card('คุณภาพข้อมูล','', emptyState('ยังไม่ได้โหลดข้อมูล','')); return; }
-  var q = DATA.issues;
+  /* ต้องผ่าน ISS() ไม่ใช่อ่าน DATA.issues ตรง ๆ
+     DATA.issues เป็น null ได้จริงเมื่อมีข้อมูลค้างในหน่วยความจำแต่ผลตรวจคุณภาพยังไม่ถูกคำนวณ
+     (เช่นกด "ล้างข้อมูลในเครื่อง" แล้ว DATA.days ยังอยู่) เดิมจะพังที่ q.score ทั้งหน้า
+     กลายเป็นการ์ด "แสดงผลหน้านี้ไม่สำเร็จ" ทั้งที่หน้าอื่นยังใช้ได้ปกติ
+     ISS() มีไว้สำหรับกรณีนี้อยู่แล้ว แต่หน้านี้ตกหล่นไป */
+  var q = ISS();
+  if(!DATA.issues){
+    host.innerHTML = card('คุณภาพข้อมูล','',
+      emptyState('ยังไม่ได้ตรวจคุณภาพข้อมูลรอบนี้',
+                 'กดปุ่ม "โหลดข้อมูล" ที่มุมขวาบนเพื่อให้ระบบตรวจไฟล์ต้นทางอีกครั้ง'));
+    return;
+  }
 
   function section(title, count, desc, fix, tableHtml){
     var ok = count===0;
@@ -6399,6 +7979,16 @@ function renderQuality(){
     + '<div class="mt-4">'
     + card('ผลการตรวจสอบทั้งหมด', 'เรียงตามความสำคัญ · แต่ละข้อบอกวิธีแก้ที่ไฟล์ต้นทาง',
         '<div class="space-y-3">'
+
+        /* แสดงเฉพาะตอนเจอปัญหา — เป็นเคสที่เกิดนาน ๆ ครั้ง ถ้าโชว์ติ๊กเขียวตลอด
+           รายการจะยาวขึ้นโดยไม่ได้บอกอะไรผู้ใช้เพิ่ม */
+        + (!(q.invalidDates||[]).length ? '' : section('ชื่อแท็บเป็นวันที่ที่ไม่มีอยู่จริง', (q.invalidDates||[]).length,
+            'เช่น แท็บ "31" ในไฟล์เดือนที่มี 30 วัน — ระบบตัดแท็บนี้ออก ไม่นำยอดไปรวม เพราะเดาไม่ได้ว่าตั้งใจเป็นวันไหน',
+            'เปิดไฟล์และแท็บที่แจ้ง แก้ชื่อแท็บ/หัวตารางให้เป็นวันที่ที่ถูกต้อง แล้วกด "โหลดใหม่ทั้งหมด" ที่หน้าตั้งค่า',
+            (q.invalidDates||[]).length ? '<div class="hint mt-2">'
+              + (q.invalidDates||[]).slice(0,40).map(function(x){
+                  return esc(x.date)+' ('+esc((x.file||'')+' / '+(x.sheet||''))+')';
+                }).join(' · ') + '</div>' : ''))
 
         + section('วันที่ยังไม่มีชีตข้อมูล', q.missingDays.length,
             'วันที่อยู่ในช่วงข้อมูลแต่ไม่มีแท็บในไฟล์ Excel เลย ทำให้กราฟแนวโน้มขาดช่วง',
@@ -7103,7 +8693,7 @@ function buildReportPages(days){
   var period = thDate(STATE.filter.from,'medium')+' – '+thDate(STATE.filter.to,'medium');
   /* คำนวณความหนาแน่นไว้ตั้งแต่ต้น เพราะบทสรุปผู้บริหารในหน้า 1 ต้องใช้ค่านี้ด้วย
      ไม่ใช่แค่กราฟในหน้า 3 (ถ้าคำนวณทีหลัง ตัวแปรจะยังเป็น undefined ตอนเขียนบทสรุป) */
-  var dp = densityAvg(days, 'p'), dc = densityAvg(days, 'c');
+  var dp = densityAvg(days, 'p', densOptOf('p')), dc = densityAvg(days, 'c', densOptOf('c'));
   var gl = gateList(cur.gateIn);
   var glTotal = sum(gl.map(function(g){ return g.total; }));
 
@@ -7545,7 +9135,7 @@ function buildInfographic(days){
   var n = cur.n||1;
   var period = thDate(STATE.filter.from,'medium')+' – '+thDate(STATE.filter.to,'medium');
   var gl = gateList(cur.gateIn), glTotal = sum(gl.map(function(g){ return g.total; }));
-  var dp = densityAvg(days,'p'), dc = densityAvg(days,'c');
+  var dp = densityAvg(days,'p',densOptOf('p')), dc = densityAvg(days,'c',densOptOf('c'));
 
   var peakI = cur.ph.indexOf(Math.max.apply(null, cur.ph));
   var dowAvg = cur.byDow.map(function(l,i){
@@ -7965,7 +9555,7 @@ function exportAllXlsx(){
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s3), 'รายชั่วโมง');
 
     // ชีต 4: ความหนาแน่น
-    var dp = densityAvg(days,'p'), dc = densityAvg(days,'c');
+    var dp = densityAvg(days,'p',densOptOf('p')), dc = densityAvg(days,'c',densOptOf('c'));
     var s4 = [['ชั่วโมง','ความหนาแน่นลูกค้า (คน)','ความหนาแน่นรถยนต์ (คัน)']];
     DENS_HOURS.forEach(function(h,i){ s4.push([hourLabel(h)+' น.', Math.round(dp.values[i]), Math.round(dc.values[i])]); });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s4), 'ความหนาแน่น');
@@ -8230,7 +9820,8 @@ async function promptInstall(){
    ยอดลูกค้าและยอดรายประตูเป็นข้อมูลภายใน ไม่ควรค้างให้คนเดินผ่านเห็นตลอดเวลา
    ม่านจึงต้อง "ทึบแสงสนิท" ไม่ใช่แค่เบลอ เพราะเบลอแล้วตัวเลขใหญ่ ๆ ยังเดาออก
 --------------------------------------------------------------------------- */
-var SPLASH_MIN_MS = 2400;      // เวลาแสดงอินโทรอย่างน้อย (ตามที่ผู้ใช้ขอ 2–3 วินาที)
+var SPLASH_MIN_MS = 2800;      // เวลาแสดงอินโทรอย่างน้อย (ตามที่ผู้ใช้ขอ 2–4 วินาที)
+var SPLASH_MAX_MS = 4000;      // เข้าโปรแกรมอัตโนมัติอย่างช้าที่สุดเท่านี้ ไม่ว่าการเตรียมระบบจะค้างที่ขั้นไหน
 var SPLASH_SHOWN_AT = Date.now();
 var LOCKED = false;
 var IDLE_TIMER = null;
@@ -8240,14 +9831,15 @@ var IDLE_TIMER = null;
 var IDLE_CHOICES = [
   { v:0,  t:'ไม่พักหน้าจอ' },
   { v:3,  t:'3 นาที' },
-  { v:5,  t:'5 นาที (แนะนำ)' },
+  { v:4,  t:'4 นาที (แนะนำ)' },
+  { v:5,  t:'5 นาที' },
   { v:10, t:'10 นาที' },
   { v:15, t:'15 นาที' },
   { v:30, t:'30 นาที' }
 ];
 function idleMinutes(){
-  var m = (CFG.idleMin === undefined) ? 5 : Number(CFG.idleMin);
-  return Number.isFinite(m) && m >= 0 ? m : 5;
+  var m = (CFG.idleMin === undefined) ? 4 : Number(CFG.idleMin);
+  return Number.isFinite(m) && m >= 0 ? m : 4;
 }
 
 function hideSplash(){
@@ -8291,10 +9883,107 @@ function resetIdle(){
   IDLE_TIMER = setTimeout(lockScreen, m * 60000);
 }
 
+/* ---------------------------------------------------------------------------
+   นาฬิกา วัน/เดือน/ปี : เวลา (v3.8)
+
+   ใช้ตัวเดียวขับทั้งสองจุด (แถบใต้หัวหน้าจอ และหน้าอินโทร/ม่านพักหน้าจอ)
+   เพราะถ้าแยกสอง interval เวลาจะเดินไม่พร้อมกันเป็นเสี้ยววินาที แล้วเห็นชัด
+   ตอนม่านพักหน้าจอจางเข้ามาทับ
+
+   ข้อควรระวังที่เจอจริง:
+     · ต้องเขียน DOM เฉพาะตอนค่าเปลี่ยน ไม่ใช่ทุกวินาที — จอที่เปิดค้างทั้งวัน
+       จะถูกสั่ง reflow 86,400 ครั้ง/วันโดยไม่จำเป็น
+     · ปี พ.ศ. คำนวณจาก ค.ศ.+543 ตรง ๆ ได้ เพราะนี่คือเวลาปัจจุบันของเครื่อง
+       (ต่างจากข้อมูลในไฟล์ Excel ที่ต้องเดาว่าเป็น พ.ศ. หรือ ค.ศ.)
+     · ชื่อวันในสัปดาห์ต้องคำนวณจาก Date จริง ห้าม hardcode
+--------------------------------------------------------------------------- */
+var CLOCK_TIMER = null;
+var CLOCK_LAST  = { date:'', hh:'', mm:'', ss:'', tag:'' };
+
+function setTxt(id, v){
+  var el = $(id);
+  if(el && el.textContent !== v) el.textContent = v;
+}
+function two(n){ return n < 10 ? '0'+n : String(n); }
+
+/* คำทักทายตามช่วงเวลา — ใช้เกณฑ์แบบที่คนไทยใช้จริงในเอกสารและการทักทาย */
+function greetOf(h){
+  if(h < 5)  return 'ดึกแล้ว ดูแลสุขภาพด้วยครับ';
+  if(h < 12) return 'อรุณสวัสดิ์';
+  if(h < 13) return 'สวัสดีตอนเที่ยง';
+  if(h < 17) return 'สวัสดีตอนบ่าย';
+  if(h < 19) return 'สวัสดีตอนเย็น';
+  return 'สวัสดีตอนค่ำ';
+}
+
+function tickClock(){
+  var d  = new Date();
+  /* TH_DOW_FULL เรียง จันทร์=0 ตามกติกาของทั้งแอป ส่วน getDay() เรียง อาทิตย์=0
+     จึงต้องแปลงด้วยสูตรเดียวกับ dowOf() ไม่งั้นวันในสัปดาห์จะเลื่อนไป 1 วัน */
+  var dowIdx = (d.getDay() + 6) % 7;
+  var dateTxt = 'วัน' + TH_DOW_FULL[dowIdx] + 'ที่ ' + d.getDate() + ' '
+              + TH_MON_FULL[d.getMonth()] + ' ' + (d.getFullYear() + 543);
+  var hh = two(d.getHours()), mm = two(d.getMinutes()), ss = two(d.getSeconds());
+  var tag = greetOf(d.getHours());
+
+  if(dateTxt !== CLOCK_LAST.date){
+    CLOCK_LAST.date = dateTxt; setTxt('lvDate', dateTxt); setTxt('spDate', dateTxt);
+    /* วันที่แบบย่อ (อา. 27 ก.ย. 69) สำหรับกล่องนาฬิกาจอกลางและบรรทัดบนมือถือ */
+    var shortTxt = TH_DOW_ABBR[dowIdx] + ' ' + d.getDate() + ' ' + TH_MON_ABBR[d.getMonth()]
+                 + ' ' + String(d.getFullYear() + 543).slice(2);
+    setTxt('lvDateS', shortTxt); setTxt('mDate', shortTxt);
+  }
+  if(hh !== CLOCK_LAST.hh){ CLOCK_LAST.hh = hh; setTxt('lvHH', hh); setTxt('spHH', hh); setTxt('mHH', hh); }
+  if(mm !== CLOCK_LAST.mm){ CLOCK_LAST.mm = mm; setTxt('lvMM', mm); setTxt('spMM', mm); setTxt('mMM', mm); }
+  if(ss !== CLOCK_LAST.ss){
+    CLOCK_LAST.ss = ss; setTxt('lvSS', ss); setTxt('spSS', ss); setTxt('mSS', ss);
+    clockHands(d);
+  }
+  if(tag !== CLOCK_LAST.tag){ CLOCK_LAST.tag = tag; setTxt('lvTag', tag); }
+}
+
+/* หมุนเข็มนาฬิกาบนแถบหัว — มุมคิดจากเวลาจริง ไม่ได้บวกสะสมทีละ 6°
+   ถ้าบวกสะสม แท็บที่ถูกพักไว้แล้วกลับมาจะได้เข็มคลาดจากเวลาจริง */
+function clockHands(d){
+  var s = d.getSeconds(), m = d.getMinutes() + s/60, h = (d.getHours() % 12) + m/60;
+  var hs = $('hcS'), hm = $('hcM'), hh = $('hcH');
+  if(hs){
+    /* วินาทีที่ 0: ปิดแอนิเมชันชั่วคราว ไม่งั้นเข็มจะหมุนย้อนกลับ 354° ทั้งรอบ */
+    hs.style.transition = s === 0 ? 'none' : '';
+    hs.style.transform = 'rotate(' + (s*6) + 'deg)';
+  }
+  if(hm) hm.style.transform = 'rotate(' + (m*6).toFixed(2) + 'deg)';
+  if(hh) hh.style.transform = 'rotate(' + (h*30).toFixed(2) + 'deg)';
+}
+
+function startClock(){
+  tickClock();
+  if(CLOCK_TIMER) clearInterval(CLOCK_TIMER);
+  /* เดินทุก 1 วินาที แล้วสั่งเดินซ้ำทันทีตอนกลับมาที่แท็บนี้
+     เพราะเบราว์เซอร์หน่วง/หยุด timer ของแท็บพื้นหลัง เวลาจะค้างอยู่ที่เดิม
+     ผู้ใช้สลับกลับมาแล้วเห็นเวลาเก่าค้างอยู่ จะเข้าใจว่าโปรแกรมแฮงก์ */
+  CLOCK_TIMER = setInterval(tickClock, 1000);
+  document.addEventListener('visibilitychange', function(){
+    if(!document.hidden) tickClock();
+  });
+}
+
 function initShell(){
   /* ตรวจไฟล์ไอคอนแบบไม่บล็อก — ไม่ต้องรอผลก่อนแสดงหน้าจอ
      เพราะถ้ารอ แล้วไฟล์ไม่มี จะหน่วงการเปิดแอปไปอีก 3 วินาทีโดยไม่จำเป็น */
   setupIcons();
+
+  /* เดินนาฬิกาตั้งแต่วินาทีแรก ก่อนหน้าอินโทรจะจางหาย
+     ถ้าเริ่มทีหลัง ผู้ใช้จะเห็น "--:--" ค้างอยู่บนหน้าอินโทรตลอด 3 วินาที */
+  startClock();
+
+  /* เข้าโปรแกรมอัตโนมัติ — กันกรณีที่ลำดับการเปิดโปรแกรมสะดุดก่อนถึง hideSplash()
+     (เช่นอ่านแคชแล้วเจอข้อมูลเสีย แล้ว exception หลุดขึ้นมา) ซึ่งเดิมจะทำให้
+     หน้าอินโทรค้างทับทั้งจอถาวร ผู้ใช้กดอะไรไม่ได้เลยและไม่มีข้อความบอกสาเหตุ */
+  setTimeout(function(){
+    var el = $('splash');
+    if(el && !LOCKED && !el.classList.contains('gone')) hideSplash();
+  }, SPLASH_MAX_MS);
 
   var sp = $('splash');
   var ic = $('splashAppIcon'); if(ic) ic.src = APP_ICON_192;
@@ -8346,28 +10035,80 @@ var VIEW_META = {
   hourly:    { title:'ยอดรายชั่วโมง',              sub:'รูปแบบการเข้า–ออกตลอดวัน และแผนภาพความหนาแน่น', filter:true, fn:renderHourly },
   vehicles:  { title:'ยานพาหนะทุกประเภท',          sub:'รถยนต์ 24 ชม. · ช่วงห้างเปิด · จยย. · แท็กซี่ · เดลิเวอรี่', filter:true, fn:renderVehicles },
   monthly:   { title:'รายเดือน / รายปี',           sub:'ภาพระยะยาว เทียบเดือนเดียวกันข้ามปี และตารางไขว้ ปี × เดือน', filter:true, fn:renderMonthly },
-  compare:   { title:'เทียบช่วงเวลา',              sub:'เทียบกับช่วงก่อนหน้า หรือช่วงเดียวกันของปีก่อน', filter:true, fn:renderCompare },
+  compare:   { title:'เปรียบเทียบหลายมิติ',        sub:'เทียบช่วงเวลา · รายวัน · ทุกฐานพร้อมกัน · รายชั่วโมง/วัน/ชั้น/ยานพาหนะ', filter:true, fn:renderCompare },
   forecast:  { title:'พยากรณ์ & ตรวจจับความผิดปกติ', sub:'คาดการณ์ล่วงหน้าและตรวจหาวันที่ยอดผิดปกติ',   filter:true,  fn:renderForecast },
   daily:     { title:'ตารางข้อมูลรายวัน',          sub:'ข้อมูลดิบรายวันพร้อมส่งออก',                  filter:true,  fn:renderDaily },
   report:    { title:'รายงาน A4',                  sub:'รายงานสรุปสำหรับผู้บริหาร พร้อมส่งออก',        filter:true,  fn:renderReport },
   infographic:{ title:'Infographic',              sub:'สรุปภาพเดียวจบ A4 แนวตั้ง สำหรับติดบอร์ดหรือส่งต่อ', filter:true, fn:renderInfographic },
+  stats:     { title:'สถิติเชิงลึก',                sub:'ค่าเฉลี่ย ส่วนเบี่ยงเบนมาตรฐาน ความผันผวน และความสัมพันธ์ระหว่างลูกค้ากับรถยนต์', filter:true, fn:renderStats },
   quality:   { title:'คุณภาพข้อมูล',               sub:'ตรวจสอบความครบถ้วนและความถูกต้องของไฟล์ต้นทาง', filter:false, fn:renderQuality },
   settings:  { title:'ตั้งค่า & ไฟล์ข้อมูล',        sub:'การเชื่อมต่อระบบหลังบ้าน และการจัดการแคช',     filter:false, fn:renderSettings }
 };
+
+/* ---- การยุบเมนู 14 -> 10 (v3.6) ----
+   ปัญหาเดิม: เมนูมีหน้าที่ทับกันจนผู้ใช้ไม่รู้ว่าควรเข้าหน้าไหน เช่น
+     "ความหนาแน่นรายชั่วโมง" กับ "ยอดรายชั่วโมง" ซึ่งหน้าหลังมีแผนภาพความหนาแน่นอยู่ด้วย
+     "รายประตู" กับ "แนวโน้มรายประตู" · "รายงาน A4" กับ "Infographic" ซึ่งเป็นเอกสารสรุปทั้งคู่
+     "รายเดือน/รายปี" กับ "เทียบช่วงเวลา" ซึ่งเป็นการเทียบข้ามเวลาเหมือนกัน
+
+   วิธีแก้ที่เลือก: จับคู่หน้าที่เป็นเรื่องเดียวกันไว้ใต้เมนูเดียว แล้วสลับด้วยแท็บย่อย
+   — ไม่ได้ลบหน้าไหนทิ้ง ทุกหน้ายังอยู่ครบและลิงก์ #ชื่อหน้า เดิมยังใช้ได้เหมือนเดิม
+     จึงไม่กระทบคนที่บุ๊กมาร์กไว้ และไม่ต้องรื้อฟังก์ชันวาดหน้าเลยสักตัว */
+var VIEW_GROUPS = [
+  { key:'overview', views:['overview'] },
+  { key:'gates',    views:['gates','gtrend'],        tabs:['ภาพรวมรายประตู','แนวโน้มรายประตู'] },
+  { key:'hourly',   views:['hourly','intensity'],    tabs:['ยอดเข้า–ออกรายชั่วโมง','ความหนาแน่นในศูนย์'] },
+  { key:'vehicles', views:['vehicles'] },
+  { key:'compare',  views:['compare','monthly','stats'], tabs:['เทียบช่วงเวลา & รายวัน','ภาพรายเดือน / รายปี','สถิติเชิงลึก'] },
+  { key:'forecast', views:['forecast'] },
+  { key:'daily',    views:['daily'] },
+  { key:'report',   views:['report','infographic'],  tabs:['รายงาน A4','Infographic'] },
+  { key:'quality',  views:['quality'] },
+  { key:'settings', views:['settings'] }
+];
+var GROUP_OF = Object.create(null);
+VIEW_GROUPS.forEach(function(g){ g.views.forEach(function(v){ GROUP_OF[v] = g; }); });
+
+/* วาดแท็บย่อยไว้นอก .view เพื่อให้ไม่หายเมื่อหน้านั้นสั่งวาดตัวเองใหม่
+   (เช่น renderIntensity ตอนสลับโหมด หรือ renderDaily ตอนกดเรียงคอลัมน์
+    ซึ่งเรียกตรง ๆ ไม่ผ่าน goView) */
+function renderGroupTabs(name){
+  var el = $('groupTabs'); if(!el) return;
+  var g = GROUP_OF[name];
+  if(!g || g.views.length < 2 || !DATA.days.length){
+    el.classList.add('hidden'); el.innerHTML = ''; return;
+  }
+  el.classList.remove('hidden');
+  el.innerHTML = '<div class="seg" role="tablist" aria-label="มุมมองย่อยของหน้านี้">'
+    + g.views.map(function(v,i){
+        var on = (v === name);
+        return '<button type="button" role="tab" data-view="'+esc(v)+'"'
+             + ' aria-selected="'+(on?'true':'false')+'"'
+             + ' class="'+(on?'on':'')+'">'+esc(g.tabs[i])+'</button>';
+      }).join('')
+    + '</div>';
+  el.querySelectorAll('button').forEach(function(b){
+    b.onclick = function(){ goView(b.dataset.view); };
+  });
+}
 
 function goView(name){
   if(!VIEW_META[name]) name = 'overview';
   STATE.view = name;
   var m = VIEW_META[name];
 
+  /* ไฮไลต์เมนูตาม "กลุ่ม" ไม่ใช่ชื่อหน้า ไม่งั้นพอสลับไปแท็บที่สองของกลุ่มเดียวกัน
+     เมนูจะดับหมดทั้งแถบ ผู้ใช้จะไม่รู้ว่าตัวเองอยู่ตรงไหน */
+  var grp = GROUP_OF[name];
   document.querySelectorAll('.nav-item').forEach(function(n){
-    n.classList.toggle('active', n.dataset.view===name);
+    n.classList.toggle('active', !!grp && n.dataset.group === grp.key);
   });
   document.querySelectorAll('.view').forEach(function(v){
     v.classList.toggle('on', v.id === 'v-'+name);
   });
   $('pageTitle').textContent = m.title;
   $('pageSub').textContent   = m.sub;
+  try{ renderGroupTabs(name); }catch(e){ console.error(e); }
 
   // ปิดปุ่มตัวกรองในหน้าที่ไม่ใช้ตัวกรอง เพื่อไม่ให้ผู้ใช้สับสนว่าทำไมกรองแล้วไม่เปลี่ยน
   $('btnFilter').style.display = m.filter ? '' : 'none';
@@ -8387,6 +10128,7 @@ function goView(name){
   if(name!=='settings' && !DATA.days.length){
     $('noData').classList.remove('hidden');
     $('v-'+name).innerHTML = '';
+    var gt = $('groupTabs'); if(gt){ gt.classList.add('hidden'); gt.innerHTML=''; }
     return;
   }
   $('noData').classList.add('hidden');
@@ -8556,10 +10298,12 @@ function bindEvents(){
     }
     if(e.key==='r' && !e.ctrlKey && !e.metaKey){ loadData(false); }
     if(e.key==='f'){ $('btnFilter').click(); }
+    /* แป้นลัดต้องตรงกับลำดับที่เห็นในเมนูจริง ไม่ใช่ลำดับใน VIEW_META
+       ซึ่งตั้งแต่ยุบเมนูแล้วไม่ตรงกันอีกต่อไป */
     var idx = parseInt(e.key,10);
     if(idx>=1 && idx<=9){
-      var keys = Object.keys(VIEW_META);
-      if(keys[idx-1]) goView(keys[idx-1]);
+      var g = VIEW_GROUPS[idx-1];
+      if(g) goView(g.views[0]);
     }
   });
 }
