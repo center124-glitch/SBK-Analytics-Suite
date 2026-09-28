@@ -867,6 +867,9 @@ html.dark #splash .sp-bg{ opacity:.34 }
 @media (min-width:1024px) and (pointer:fine){
   html{ scroll-snap-type:y proximity; scroll-padding-top:86px }
   .view.on > *, #groupTabs{ scroll-snap-align:start }
+  /* (v4.3) แถบบริบทต้องเป็นจุด snap ด้วย — ไม่งั้นเบราว์เซอร์ snap ไปที่แท็บย่อยตั้งแต่โหลดหน้า
+     แถบช่วงเวลาจะหลบไปอยู่ใต้แถบหัว ผู้ใช้มองไม่เห็นว่ากำลังดูช่วงไหน */
+  #ctxBar{ scroll-snap-align:start }
   /* การ์ดกราฟหนึ่งใบต้องอยู่ในจอเดียวได้: หักแถบหัว + หัวการ์ด + ขอบ ≈ 260px */
   #content .chart-box{ height:clamp(220px, calc(100vh - 260px), var(--ch,300px)) }
 }
@@ -889,6 +892,72 @@ html.dark #splash .sp-bg{ opacity:.34 }
   .dim-body{ grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); align-items:start }
   .dim-tbl .tbl-wrap{ max-height:clamp(220px, calc(100vh - 260px), 320px); overflow:auto }
   .dim-tbl thead th{ position:sticky; top:0; z-index:1 }
+}
+
+/* ---------------- (v4.3) กระชับพื้นที่ ----------------
+   แถบเครื่องมือของหน้า (โหมดเทียบ / กลุ่มวัน / วันที่) เป็นบรรทัดเดียว
+   แทนการ์ด 2–3 ชั้นเดิม — ประหยัดความสูงราว 70–100px ต่อหน้า */
+.vtool{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px;
+        padding:8px 12px; background:var(--surface); border:1px solid var(--line);
+        border-radius:14px; box-shadow:0 1px 2px rgba(6,56,42,.04) }
+.vt-inline{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px }
+.vt-lb{ font-size:12px; font-weight:700; color:var(--muted); white-space:nowrap }
+.vt-sep, .vt-vs{ font-size:12px; color:var(--faint); font-weight:700 }
+.vt-info{ margin-left:auto; display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; font-size:12.5px }
+.vt-pill{ display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:99px;
+          background:var(--surface-2); border:1px solid var(--line); white-space:nowrap }
+.vt-pill i{ width:8px; height:8px; border-radius:50%; display:inline-block }
+.vt-pill.a i{ background:var(--c-emerald) }
+.vt-pill.b i{ background:#7A8B7F }
+.inp.inp-sm{ padding:5px 9px; font-size:12.5px; min-height:32px; border-radius:9px; width:auto }
+@media (max-width:767.98px){
+  .vt-info{ margin-left:0 } .vtool{ padding:8px 10px }
+  .vt-info .hint, .vt-vs{ display:none }
+  /* ปุ่มโหมด/แท็บย่อยบนมือถือ: เลื่อนแนวนอนได้ ไม่ให้ข้อความหักเป็น 2 บรรทัด */
+  .vtool .seg, #groupTabs .seg{ overflow-x:auto; max-width:100%; -webkit-overflow-scrolling:touch; scrollbar-width:none }
+  .vtool .seg::-webkit-scrollbar, #groupTabs .seg::-webkit-scrollbar{ display:none }
+  .vtool .seg button, #groupTabs .seg button{ white-space:nowrap; flex:0 0 auto }
+  /* บรรทัดสรุปบนมือถือ: 3 ข้อแรกพอ (ยอดคน · ยอดรถ · ชั่วโมงพีค) ที่เหลือดูในการ์ดด้านล่าง */
+  .insight{ font-size:12.5px; padding:8px 11px }
+  .ins-p:nth-child(n+4){ display:none }
+  .ins-p{ display:block } .ins-p + .ins-p::before{ content:none }
+}
+
+/* บรรทัดสรุปความหมาย */
+.insight{ display:flex; gap:10px; align-items:flex-start; margin-top:10px;
+          padding:9px 14px; border-radius:14px; font-size:13px; line-height:1.75;
+          background:rgba(0,137,96,.07);
+          background:color-mix(in srgb, var(--accent) 7%, var(--surface));
+          border:1px solid color-mix(in srgb, var(--accent) 22%, var(--line)) }
+.view.on > .insight:first-child{ margin-top:0 }
+.ins-ic{ font-size:15px; line-height:1.6 }
+.ins-body b{ font-weight:800 }
+.ins-p + .ins-p::before{ content:'·'; color:var(--faint); margin:0 8px }
+.ins-t{ font-weight:800; white-space:nowrap }
+.ins-t.up{ color:var(--ok) } .ins-t.dn{ color:var(--err) } .ins-t.flat{ color:var(--muted) }
+.ins-m{ color:var(--muted); font-size:12px }
+
+/* ตัวกรองด่วนในแถบบริบท */
+.ctx-sel{ appearance:auto; font:inherit; font-size:12px; font-weight:700; padding:3px 8px; border-radius:99px;
+          border:1px solid var(--line); background:var(--surface); color:var(--text); cursor:pointer; max-width:190px }
+.ctx-sel.on{ border-color:var(--accent); color:var(--accent);
+             background:rgba(0,137,96,.08); background:color-mix(in srgb, var(--accent) 9%, var(--surface)) }
+.ctx-live{ font-size:11.5px; font-weight:700; color:var(--muted); min-width:0; transition:opacity .3s }
+.ctx-live:empty{ display:none }
+.ctx-live.busy{ color:var(--warn) } .ctx-live.done{ color:var(--ok) }
+
+/* การ์ด KPI ที่ค่าเปลี่ยน — กะพริบขอบเบา ๆ ครั้งเดียว บอกตาว่า "ใบนี้เปลี่ยน" */
+@keyframes kpiFlash{ 0%{ box-shadow:0 0 0 0 rgba(0,137,96,.45) } 100%{ box-shadow:0 0 0 10px rgba(0,137,96,0) } }
+.kpi.kpi-flash{ animation:kpiFlash .7s ease-out 1 }
+@media (prefers-reduced-motion:reduce){ .kpi.kpi-flash{ animation:none } }
+
+/* ระยะภายในโดยรวม — ลดลงเล็กน้อยทุกหน้า (จอ ≥1024px) */
+@media (min-width:1024px){
+  .card-h{ padding:14px 18px 0 }
+  .card-b{ padding:12px 18px 16px }
+  .kpi{ padding:13px 16px }
+  .ctx{ padding:7px 11px; gap:5px }
+  #groupTabs:not(.hidden){ margin-bottom:10px }
 }
 
 /* ---------------- รายงาน A4 แนวนอน ----------------
@@ -1616,7 +1685,7 @@ table.tbl th[aria-sort="descending"]::after{ content:'\25BC'; opacity:1; color:v
    ส่วนที่ 1 · ค่าคงที่ และเครื่องมือพื้นฐาน
 ============================================================================ */
 
-var APP_VERSION = '4.2';
+var APP_VERSION = '4.3';
 
 /* โลโก้ Seacon Bangkae ฝังเป็น data URL — ไฟล์เดียวจบ ไม่ต้องแนบรูปแยก
    มี 2 ชุด: ชุดสีเดิมสำหรับพื้นสว่าง/รายงาน และชุดตัวอักษรสีขาวสำหรับพื้นมืด */
@@ -3486,7 +3555,18 @@ function renderCtxBar(){
   if(f.floor && f.floor!=='all')
     chips.push('<span class="ctx-chip" style="--c2:var(--brand-3)">'+esc(f.floor)
       + '<button data-clear="floor" title="ยกเลิกตัวกรองชั้น" aria-label="ยกเลิกตัวกรองชั้น">×</button></span>');
+  /* (v4.3) ตัวกรองด่วน: ประเภทวัน และ ชั้น เลือกได้ตรงนี้เลย ไม่ต้องเปิดแผงตัวกรอง
+     เปลี่ยนแล้ว KPI และกราฟทั้งหน้าอัปเดตทันที (ผ่าน onFilterChange ตัวเดียวกับแผง) */
+  var dtOpts = '<option value="all">ทุกประเภทวัน</option>' + Object.keys(DAYTYPE_TH).map(function(k){
+    return '<option value="'+k+'"'+(f.dayType===k?' selected':'')+'>'+esc(DAYTYPE_TH[k])+'</option>';
+  }).join('');
+  var flSrc = $('fFloor'), flOpts = flSrc ? flSrc.innerHTML : '<option value="all">ทุกชั้น</option>';
+  chips = chips.filter(function(c){ return c.indexOf('data-clear=') < 0; });   // ย้ายไปเป็นดรอปดาวน์แทนชิป
+  chips.push('<select class="ctx-sel'+(f.dayType && f.dayType!=='all' ? ' on' : '')+'" id="ctxDayType" aria-label="ประเภทวัน">'+dtOpts+'</select>');
+  chips.push('<select class="ctx-sel'+(f.floor && f.floor!=='all' ? ' on' : '')+'" id="ctxFloor" aria-label="ชั้นของประตู">'+flOpts+'</select>');
+  chips.push('<span class="ctx-live" id="ctxLive" aria-live="polite"></span>');
   var ch = $('ctxChips'); if(ch) ch.innerHTML = chips.join('');
+  var cfl = $('ctxFloor'); if(cfl) cfl.value = f.floor || 'all';
 
   renderCtxNote();
   bindCtxBar();
@@ -3573,6 +3653,16 @@ function bindCtxBar(){
   if(more) more.onclick = function(){ var b=$('btnFilter'); if(b) b.click(); };
   var vb = $('ctxValues');
   if(vb){ vb.onclick = toggleValues; syncValuesBtn(); }
+  var qd = $('ctxDayType');
+  if(qd) qd.onchange = function(){
+    STATE.filter.dayType = qd.value; var o = $('fDayType'); if(o) o.value = qd.value;
+    qd.classList.toggle('on', qd.value !== 'all'); onFilterChange();
+  };
+  var qf = $('ctxFloor');
+  if(qf) qf.onchange = function(){
+    STATE.filter.floor = qf.value; var o = $('fFloor'); if(o) o.value = qf.value;
+    qf.classList.toggle('on', qf.value !== 'all'); onFilterChange();
+  };
 }
 
 
@@ -5161,8 +5251,10 @@ function renderOverview(){
              avgCar:list.length? sum(list.map(function(r){return r.carIn;}))/list.length : 0 };
   });
 
+  var prLbl = (previousRange(STATE.filter.from, STATE.filter.to) || {}).label || 'ช่วงก่อนหน้า';
   host.innerHTML =
-      '<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">'+kpis+'</div>'
+      insightStrip(cur, prev, prLbl.replace(/\s*\(.*\)$/, ''))
+    + '<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4'+(cur.n ? ' mt-3' : '')+'">'+kpis+'</div>'
     + '<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4 mt-4">'+kpis2+'</div>'
 
     + '<div class="mt-4">'
@@ -6046,6 +6138,45 @@ function renderHourly(){
   }, {});
 }
 /* ============================================================================
+   (v4.3) บรรทัดสรุปความหมาย — "เห็นตัวเลข → เข้าใจทันที"
+   การ์ด KPI บอก "เท่าไหร่" แต่ผู้บริหารต้องการรู้ "แปลว่าอะไร" ก่อน
+   จึงแปลงตัวเลขสำคัญเป็นประโยคสั้น ๆ พร้อมทิศทาง (เพิ่มขึ้น/ลดลง/ทรงตัว)
+   ทุกค่าในประโยคคำนวณจากชุดเดียวกับการ์ด KPI เป๊ะ จึงไม่มีตัวเลขขัดกันเอง
+============================================================================ */
+function trendPhrase(p, vsLabel){
+  if(p === null || !Number.isFinite(p)) return '';
+  var a = Math.abs(p);
+  if(a < 1) return '<span class="ins-t flat">ทรงตัว ('+fmtPct(p)+')</span>';
+  return '<span class="ins-t '+(p>0?'up':'dn')+'">'+(p>0?'▲ เพิ่มขึ้น ':'▼ ลดลง ')+fmt1(a)+'%</span>'
+       + (vsLabel ? ' <span class="ins-m">จาก'+esc(vsLabel)+'</span>' : '');
+}
+function insightStrip(cur, prev, vsLabel){
+  if(!cur || !cur.n) return '';
+  var parts = [];
+  var aIn = safeDiv(cur.custIn, cur.n), bIn = prev && prev.n ? safeDiv(prev.custIn, prev.n) : null;
+  var aCar = safeDiv(cur.carIn, cur.n), bCar = prev && prev.n ? safeDiv(prev.carIn, prev.n) : null;
+  parts.push('ลูกค้าเข้าเฉลี่ย <b>'+fmt(aIn)+'</b> คน/วัน ' + trendPhrase(pctChange(aIn, bIn), vsLabel));
+  parts.push('รถยนต์เข้าเฉลี่ย <b>'+fmt(aCar)+'</b> คัน/วัน ' + trendPhrase(pctChange(aCar, bCar), ''));
+  /* ชั่วโมงที่คนเข้ามากที่สุด — ใช้จัดกำลังคน รปภ./แม่บ้าน */
+  var bi = -1, bv = -1;
+  (cur.ph||[]).forEach(function(v,i){ if(v > bv){ bv = v; bi = i; } });
+  if(bi >= 0 && bv > 0) parts.push('คนเข้ามากสุดช่วง <b>'+hourLabel(PED_HOURS[bi])+' น.</b>');
+  /* เสาร์–อาทิตย์เทียบวันธรรมดา — ความต่างที่สำคัญที่สุดของศูนย์การค้า */
+  var wd = [], we = [];
+  (cur.byDate||[]).forEach(function(r){ if(r.dow >= 5) we.push(r.custIn); else if(!r.hol) wd.push(r.custIn); });
+  var pw = (wd.length && we.length) ? pctChange(sum(we)/we.length, sum(wd)/wd.length) : null;
+  if(pw !== null && Number.isFinite(pw)){
+    parts.push(Math.abs(pw) < 1
+      ? 'เสาร์–อาทิตย์คน<b>ใกล้เคียง</b>วันธรรมดา'
+      : 'เสาร์–อาทิตย์คน'+(pw > 0 ? 'มากกว่า' : 'น้อยกว่า')+'วันธรรมดา <b>'+fmt1(Math.abs(pw))+'%</b>');
+  }
+  if(cur.peak && isIso(cur.peak.d)) parts.push('วันที่คนมากสุด <b>'+esc(thDateDow(cur.peak.d))+'</b>');
+  return '<div class="insight" role="note" aria-label="สรุปความหมายของตัวเลข">'
+    + '<span class="ins-ic" aria-hidden="true">💡</span>'
+    + '<div class="ins-body">'+parts.map(function(x){ return '<span class="ins-p">'+x+'</span>'; }).join('')+'</div></div>';
+}
+
+/* ============================================================================
    ส่วนที่ 20 · หน้า "เทียบช่วงเวลา" (MoM / YoY / กำหนดเอง)
 ============================================================================ */
 function renderCompare(){
@@ -6177,7 +6308,8 @@ function renderCompare(){
   }).join('');
 
   host.innerHTML = compareControls(aFrom,aTo,bFrom,bTo,modeLabel,LB)
-    + '<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4 mt-4">'+kpis+'</div>'
+    + insightStrip(A, B, LB.b)
+    + '<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4 mt-3">'+kpis+'</div>'
 
     + '<div class="mt-4">' + cmpMultiBase(aFrom, aTo, A, pick, f.floor) + '</div>'
     + '<div class="mt-4" id="cmpDimHost"></div>'
@@ -6203,32 +6335,33 @@ function renderCompare(){
 }
 
 function compareControls(aFrom,aTo,bFrom,bTo,modeLabel,LB){
+  /* (v4.3) แถบเครื่องมือบรรทัดเดียว — เดิมเป็นการ์ด 3 ชั้น (ปุ่มโหมด / เส้นคั่น / ช่วงวันที่)
+     สูง ~125px และมีพื้นที่ว่างมาก ผู้ใช้สะท้อนว่า "ระยะห่างเกินไป"
+     ตอนนี้ปุ่มโหมด + ช่วงที่เทียบอยู่บรรทัดเดียว สูงราว 52px บนจอกว้าง */
   var m = STATE.compare.mode;
   LB = LB || rangeLabelPair(aFrom,aTo,bFrom,bTo);
-  return '<div class="card"><div class="card-b">'
-    + '<div class="flex flex-wrap items-center gap-3">'
-    +   '<div class="seg" id="cmpMode">'
-    +     '<button data-m="mom" class="'+(m==='mom'?'on':'')+'">เทียบช่วงก่อนหน้า</button>'
-    +     '<button data-m="yoy" class="'+(m==='yoy'?'on':'')+'">เทียบปีก่อน (YoY)</button>'
-    +     '<button data-m="custom" class="'+(m==='custom'?'on':'')+'">กำหนดเอง</button>'
-    +     '<button data-m="day" class="'+(m==='day'?'on':'')+'">เทียบรายวัน</button>'
-    +   '</div>'
-    +   '<span class="hint">'+esc(modeLabel)+'</span>'
+  function btn(k,t){ return '<button data-m="'+k+'" class="'+(m===k?'on':'')+'">'+t+'</button>'; }
+  return '<div class="vtool">'
+    + '<div class="seg" id="cmpMode">'
+    +   btn('mom','เทียบช่วงก่อนหน้า') + btn('yoy','เทียบปีก่อน (YoY)') + btn('custom','กำหนดเอง') + btn('day','เทียบรายวัน')
     + '</div>'
     + (m==='custom'
-        ? '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 pt-3 border-t" style="border-color:var(--line)">'
-          /* addDays คืน null ได้ ถ้าปล่อยผ่านจะได้ value="null" แล้วเบราว์เซอร์ทิ้งค่า
-             ผู้ใช้จะเห็นช่องวันที่ว่างเปล่าโดยไม่รู้ว่าทำไม */
-          + '<div><label class="lb">ช่วงเทียบ ตั้งแต่</label><input type="date" class="inp w-full" id="cmpBFrom" value="'+esc(isIso(bFrom)?bFrom:'')+'"></div>'
-          + '<div><label class="lb">ช่วงเทียบ ถึง</label><input type="date" class="inp w-full" id="cmpBTo" value="'+esc(isIso(bTo)?bTo:'')+'"></div>'
-          + '<div class="flex items-end"><button class="btn btn-primary" id="cmpApply">ใช้ช่วงนี้</button></div>'
+        ? '<div class="vt-inline">'
+          /* addDays คืน null ได้ ถ้าปล่อยผ่านจะได้ value="null" แล้วเบราว์เซอร์ทิ้งค่า */
+          + '<label class="vt-lb" for="cmpBFrom">ช่วงเทียบ</label>'
+          + '<input type="date" class="inp inp-sm" id="cmpBFrom" value="'+esc(isIso(bFrom)?bFrom:'')+'">'
+          + '<span class="vt-sep">–</span>'
+          + '<input type="date" class="inp inp-sm" id="cmpBTo" aria-label="ช่วงเทียบ ถึง" value="'+esc(isIso(bTo)?bTo:'')+'">'
+          + '<button class="btn btn-sm btn-primary" id="cmpApply">ใช้ช่วงนี้</button>'
           + '</div>'
         : '')
-    + '<div class="flex flex-wrap gap-4 mt-3 pt-3 border-t text-[12.5px]" style="border-color:var(--line)">'
-    +   '<div><span style="color:var(--muted)">'+esc(LB.a)+':</span> <b>'+thDate(aFrom,'medium')+' – '+thDate(aTo,'medium')+'</b></div>'
-    +   '<div><span style="color:var(--muted)">'+esc(LB.b)+':</span> <b>'+thDate(bFrom,'medium')+' – '+thDate(bTo,'medium')+'</b></div>'
+    + '<div class="vt-info">'
+    +   '<span class="vt-pill a"><i></i><b>'+esc(LB.a)+'</b> '+thDate(aFrom,'short')+' – '+thDate(aTo,'short')+'</span>'
+    +   '<span class="vt-vs">เทียบ</span>'
+    +   '<span class="vt-pill b"><i></i><b>'+esc(LB.b)+'</b> '+thDate(bFrom,'short')+' – '+thDate(bTo,'short')+'</span>'
+    +   '<span class="hint">'+esc(modeLabel)+'</span>'
     + '</div>'
-    + '</div></div>';
+    + '</div>';
 }
 function bindCompare(){
   var seg=$('cmpMode');
@@ -6740,38 +6873,35 @@ function renderDayCompare(host){
 function dayCompareControls(day, baseKey, other){
   var b = dayBaseOf(baseKey);
   var iso = b.shift === null ? other : (isIso(day) ? addDays(day, b.shift) : '');
-  /* จำกัดปฏิทินให้อยู่ในช่วงที่มีข้อมูลจริง — ผู้ใช้จะไม่เผลอเลือกปี 2030
-     แล้วนั่งงงว่าทำไมไม่มีตัวเลข (ยังพิมพ์เองได้ จึงยังต้องตรวจซ้ำตอนวาด) */
+  /* จำกัดปฏิทินให้อยู่ในช่วงที่มีข้อมูลจริง (ยังพิมพ์เองได้ จึงยังตรวจซ้ำตอนวาด) */
   var rng = DATA.days.length
     ? ' min="'+esc(DATA.days[0].d)+'" max="'+esc(DATA.days[DATA.days.length-1].d)+'"' : '';
-  return '<div class="card"><div class="card-b">'
+  return '<div class="vtool">'
     + '<div class="seg" id="cmpMode">'
     +   '<button data-m="mom">เทียบช่วงก่อนหน้า</button>'
     +   '<button data-m="yoy">เทียบปีก่อน (YoY)</button>'
     +   '<button data-m="custom">กำหนดเอง</button>'
     +   '<button data-m="day" class="on">เทียบรายวัน</button>'
     + '</div>'
-    + '<div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 pt-3 border-t" style="border-color:var(--line)">'
-    +   '<div><label class="lb" for="dayPick">วันที่ต้องการดู</label>'
-    +     '<input type="date" class="inp w-full" id="dayPick"'+rng+' value="'+esc(isIso(day)?day:'')+'"></div>'
-    +   '<div><label class="lb" for="dayBase">นำไปเทียบกับ</label>'
-    +     '<select class="inp w-full" id="dayBase">'
-    +       DAY_BASES.map(function(x){
-              return '<option value="'+esc(x.k)+'"'+(x.k===baseKey?' selected':'')+'>'
-                   + esc(dayBaseLabel(x, day)) + (x.shift===null?'':' — '+esc(x.desc)) + '</option>';
-            }).join('')
-    +     '</select></div>'
-    +   '<div><label class="lb" for="dayOther">วันที่นำมาเทียบ</label>'
-    +     '<input type="date" class="inp w-full" id="dayOther"'+rng
-    +       (b.shift === null ? '' : ' disabled')
-    +       ' value="'+esc(isIso(iso)?iso:'')+'"></div>'
+    + '<div class="vt-inline">'
+    +   '<label class="vt-lb" for="dayPick">วันที่ดู</label>'
+    +   '<input type="date" class="inp inp-sm" id="dayPick"'+rng+' value="'+esc(isIso(day)?day:'')+'">'
+    +   '<label class="vt-lb" for="dayBase">เทียบกับ</label>'
+    +   '<select class="inp inp-sm" id="dayBase">'
+    +     DAY_BASES.map(function(x){
+            return '<option value="'+esc(x.k)+'"'+(x.k===baseKey?' selected':'')+' title="'+esc(x.desc)+'">'
+                 + esc(dayBaseLabel(x, day)) + '</option>';
+          }).join('')
+    +   '</select>'
+    +   '<input type="date" class="inp inp-sm" id="dayOther" aria-label="วันที่นำมาเทียบ"'+rng
+    +     (b.shift === null ? '' : ' disabled') + ' value="'+esc(isIso(iso)?iso:'')+'">'
     + '</div>'
-    + '<div class="flex flex-wrap gap-4 mt-3 pt-3 border-t text-[12.5px]" style="border-color:var(--line)">'
-    +   '<div><span style="color:var(--muted)">วันที่เลือก:</span> <b>'+(isIso(day)?esc(thDateDow(day)):'—')+'</b></div>'
-    +   '<div><span style="color:var(--muted)">นำไปเทียบกับ:</span> <b>'+(isIso(iso)?esc(thDateDow(iso)):'—')+'</b></div>'
-    +   '<div class="hint">โหมดนี้ดูได้ทุกวันในระบบ ไม่จำกัดตามช่วงวันที่ในตัวกรอง</div>'
+    + '<div class="vt-info">'
+    +   '<span class="vt-pill a"><i></i><b>'+(isIso(day)?esc(thDateDow(day)):'—')+'</b></span>'
+    +   '<span class="vt-vs">เทียบ</span>'
+    +   '<span class="vt-pill b"><i></i><b>'+(isIso(iso)?esc(thDateDow(iso)):'—')+'</b></span>'
     + '</div>'
-    + '</div></div>';
+    + '</div>';
 }
 
 function bindDayCompare(){
@@ -6879,7 +7009,7 @@ function shiftYm(ym, deltaMonths){
 }
 
 function statSelect(id, val){
-  return '<select class="inp w-full" id="'+id+'">'
+  return '<select class="inp inp-sm" id="'+id+'">'
     + STAT_GROUPS.map(function(g){
         return '<option value="'+esc(g.k)+'"'+(g.k === val ? ' selected' : '')+'>'+esc(g.label)+'</option>';
       }).join('')
@@ -6887,19 +7017,20 @@ function statSelect(id, val){
 }
 function statControls(nA, nB){
   var gA = statGroupOf(STATE.statA), gB = statGroupOf(STATE.statB);
-  return '<div class="card"><div class="card-b">'
-    + '<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">'
-    +   '<div><label class="lb" for="statA">กลุ่มวันที่ 1</label>'+statSelect('statA', STATE.statA)+'</div>'
-    +   '<div><label class="lb" for="statB">กลุ่มวันที่ 2 (ใช้เทียบ)</label>'+statSelect('statB', STATE.statB)+'</div>'
-    +   '<div class="flex items-end"><button class="btn btn-sm" id="statPreset">จันทร์–ศุกร์ เทียบ เสาร์–อาทิตย์</button></div>'
-    +   '<div class="flex items-end"><button class="btn btn-sm" id="statSwap">สลับสองกลุ่ม</button></div>'
+  return '<div class="vtool">'
+    + '<div class="vt-inline">'
+    +   '<label class="vt-lb" for="statA">กลุ่ม 1</label>'+statSelect('statA', STATE.statA)
+    +   '<span class="vt-vs">เทียบ</span>'
+    +   '<label class="vt-lb" for="statB">กลุ่ม 2</label>'+statSelect('statB', STATE.statB)
+    +   '<button class="btn btn-sm" id="statPreset" title="ตั้งเป็น จันทร์–ศุกร์ เทียบ เสาร์–อาทิตย์">จ–ศ vs ส–อา</button>'
+    +   '<button class="btn btn-sm" id="statSwap" title="สลับกลุ่ม 1 กับกลุ่ม 2">⇄ สลับ</button>'
     + '</div>'
-    + '<div class="flex flex-wrap gap-4 mt-3 pt-3 border-t text-[12.5px]" style="border-color:var(--line)">'
-    +   '<div><span style="color:var(--muted)">กลุ่มที่ 1:</span> <b>'+esc(gA.label)+'</b> ('+fmt(nA)+' วัน)</div>'
-    +   '<div><span style="color:var(--muted)">กลุ่มที่ 2:</span> <b>'+esc(gB.label)+'</b> ('+fmt(nB)+' วัน)</div>'
-    +   '<div class="hint">ทั้งสองกลุ่มคัดจากช่วงวันที่และตัวกรองด้านบนเสมอ</div>'
+    + '<div class="vt-info">'
+    +   '<span class="vt-pill a"><i></i>กลุ่ม 1 <b>'+fmt(nA)+' วัน</b></span>'
+    +   '<span class="vt-pill b"><i></i>กลุ่ม 2 <b>'+fmt(nB)+' วัน</b></span>'
+    +   '<span class="hint">คัดจากช่วงวันที่และตัวกรองด้านบน</span>'
     + '</div>'
-    + '</div></div>';
+    + '</div>';
 }
 function bindStats(){
   var a = $('statA'), b = $('statB'), p = $('statPreset'), s = $('statSwap');
@@ -10634,6 +10765,7 @@ function renderCurrent(){
     toast('แสดงผลหน้านี้ไม่สำเร็จ: '+e.message,'err');
   }
   try{ updateSecNav(); }catch(e){}
+  try{ animateKpis(); }catch(e){}
 }
 
 /* ---------------------------------------------------------------------------
@@ -10658,7 +10790,8 @@ function sectionTops(){
   Array.prototype.forEach.call(v.children, function(el){
     if(el.offsetHeight > 0) out.push(Math.round(el.getBoundingClientRect().top + y));
   });
-  var gt = $('groupTabs'); if(gt && gt.offsetHeight > 0) out.unshift(Math.round(gt.getBoundingClientRect().top + y));
+  /* ไม่นับแถบแท็บย่อยเป็น "ส่วน" — กด ▼ ครั้งแรกจากบนสุดเคยเลื่อนแค่ซ่อนแถบช่วงเวลา
+     ซึ่งผู้ใช้ไม่ได้ต้องการ ควรพาไปการ์ดแรกของเนื้อหาเลย */
   return out;
 }
 function goSection(dir){
@@ -10822,10 +10955,61 @@ var FILTER_TIMER = null;
    ถ้าวาดทุกครั้งที่เปลี่ยนจะกระตุกเมื่อข้อมูลเยอะ */
 function onFilterChange(){
   clearTimeout(FILTER_TIMER);
+  setLive('busy');
   FILTER_TIMER = setTimeout(function(){
+    /* (v4.3) อัปเดตแบบ real-time ที่ไม่กระตุก:
+       · จำตำแหน่งเลื่อนไว้ — renderAll ล้างหน้าก่อนวาดใหม่ หน้าจะหดแล้วเด้งกลับขึ้นบนสุด
+         ผู้ใช้ที่กำลังดูกราฟด้านล่างต้องเลื่อนกลับลงไปเองทุกครั้งที่เปลี่ยนตัวกรอง
+       · ตัวเลข KPI นับจากค่าเดิมไปค่าใหม่ ให้เห็นว่า "อะไรเปลี่ยน และเปลี่ยนไปทางไหน" */
+    var y = window.scrollY || 0;
+    KPI_ANIM = true;
     updateFilterSummary();
     renderAll();
+    try{ window.scrollTo(0, Math.min(y, document.documentElement.scrollHeight)); }catch(e){}
+    setLive('done');
   }, 120);
+}
+
+/* ตัวบอกสถานะอัปเดตในแถบบริบท */
+var LIVE_TIMER = null;
+function setLive(state){
+  var el = $('ctxLive'); if(!el) return;
+  clearTimeout(LIVE_TIMER);
+  if(state === 'busy'){ el.className = 'ctx-live busy'; el.textContent = 'กำลังอัปเดต…'; return; }
+  el.className = 'ctx-live done'; el.textContent = '✓ อัปเดตแล้ว';
+  LIVE_TIMER = setTimeout(function(){ el.className = 'ctx-live'; el.textContent = ''; }, 1600);
+}
+
+/* ---- นับตัวเลข KPI จากค่าเดิมไปค่าใหม่ ----
+   จำค่าล่าสุดของการ์ดแต่ละใบ (คีย์ = หน้า + ชื่อการ์ด) แล้วเล่นแอนิเมชัน
+   เฉพาะรอบที่เกิดจากการเปลี่ยนตัวกรอง — เปิดหน้าเฉย ๆ ไม่ต้องนับ จะดูรก */
+var KPI_PREV = Object.create(null), KPI_ANIM = false;
+function animateKpis(){
+  var run = KPI_ANIM; KPI_ANIM = false;
+  var reduce = false;
+  try{ reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+  document.querySelectorAll('.view.on .kpi').forEach(function(card){
+    var lab = card.querySelector('.kpi-l'), val = card.querySelector('.kpi-v');
+    if(!lab || !val || !val.firstChild || val.firstChild.nodeType !== 3) return;
+    var key = STATE.view + '|' + lab.textContent;
+    var txt = val.firstChild.nodeValue.trim();
+    var to = parseFloat(txt.replace(/,/g,''));
+    var from = KPI_PREV[key];
+    KPI_PREV[key] = to;
+    if(!run || reduce || !Number.isFinite(to) || !Number.isFinite(from) || from === to) return;
+    var dec = (txt.split('.')[1] || '').length, node = val.firstChild, t0 = null, dur = 520;
+    card.classList.remove('kpi-flash'); void card.offsetWidth; card.classList.add('kpi-flash');
+    function step(ts){
+      if(t0 === null) t0 = ts;
+      var k = Math.min(1, (ts - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      var v = from + (to - from) * e;
+      node.nodeValue = k < 1
+        ? v.toLocaleString('th-TH', { minimumFractionDigits:dec, maximumFractionDigits:dec })
+        : txt;                                        // เฟรมสุดท้ายใช้ข้อความจริงเป๊ะ ไม่ปัดเพี้ยน
+      if(k < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
 }
 
 function syncThemeIcons(){
