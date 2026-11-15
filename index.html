@@ -1770,7 +1770,7 @@ table.tbl th[aria-sort="descending"]::after{ content:'\25BC'; opacity:1; color:v
    ส่วนที่ 1 · ค่าคงที่ และเครื่องมือพื้นฐาน
 ============================================================================ */
 
-var APP_VERSION = '4.4';
+var APP_VERSION = '4.5';
 
 /* โลโก้ Seacon Bangkae ฝังเป็น data URL — ไฟล์เดียวจบ ไม่ต้องแนบรูปแยก
    มี 2 ชุด: ชุดสีเดิมสำหรับพื้นสว่าง/รายงาน และชุดตัวอักษรสีขาวสำหรับพื้นมืด */
@@ -2708,6 +2708,18 @@ var API = (function(){
          จึงบอกทั้ง 4 ข้อไปเลย พร้อมวิธีพิสูจน์ด้วยตัวเองใน 10 วินาที */
       s.onerror = function(){ if(done) return; done=true; cleanup();
         rej(new Error(jsonpDiagnosis_())); };
+      /* (v4.5) สคริปต์ "โหลดสำเร็จ" แต่ไม่ได้เรียก callback = หลังบ้านส่งอย่างอื่นกลับมา
+         กรณีที่พบบ่อยที่สุดคือหน้า Sign in ของ Google (ยังไม่ได้ตั้ง Who has access เป็น Anyone)
+         เบราว์เซอร์โหลดหน้า HTML นั้นมาเป็นสคริปต์ → แปลไม่ออก → onerror "ไม่ทำงาน"
+         เพราะถือว่าดาวน์โหลดสำเร็จแล้ว · เดิมจึงต้องรอจนหมดเวลา 90 วินาที (ไฟล์ข้อมูล 5 นาที)
+         ปุ่มโหลดหมุนค้างโดยไม่มีข้อความใด ๆ — ตอนนี้ตรวจทันทีที่สคริปต์โหลดเสร็จ */
+      s.onload = function(){
+        setTimeout(function(){
+          if(done) return; done = true; cleanup();
+          rej(new Error('ระบบหลังบ้านส่งหน้าเว็บกลับมาแทนข้อมูล — สาเหตุที่พบบ่อยที่สุด: ตอน Deploy ยังไม่ได้ตั้ง '
+            + '"Who has access" เป็น Anyone หรือ URL ชี้ไปที่ deployment เก่า · ตรวจสอบได้ที่ปุ่ม "ทดสอบการเชื่อมต่อ" ในหน้าตั้งค่า'));
+        }, 60);
+      };
       s.src = buildUrl(Object.assign({}, params, { callback: cb }));
       document.head.appendChild(s);
     });
@@ -3108,7 +3120,7 @@ function buildModel(fileRecs){
    แล้ววันที่มีรถหมื่นคันจะถูกวันที่แทบว่างทับทิ้ง — ตรวจไม่พบจากหน้าจอเลย */
 function totalOf(d){
   var s = d.s||{};
-  function n(v){ return Number.isFinite(v) ? v : 0; }
+  var n = num;      // (v4.5) ใช้ตัวแปลงเดียวกับ enrichDay — ยอดที่เป็นข้อความตัวเลขต้องถูกนับด้วย
   return n(s.custIn)+n(s.custOut)
        + n(s.carIn24 !== undefined ? s.carIn24  : s.carIn)
        + n(s.carOut24!== undefined ? s.carOut24 : s.carOut);
@@ -3124,11 +3136,12 @@ function enrichDay(d, iso){
     be:  beYear(iso),
     ym:  ymOf(iso),
     hol: isHoliday(iso),
-    pn: d.pn||[],  pno: d.pno||[],  vni: d.vni||[],  vno: d.vno||[],
-    pi: d.pi||[],  po:  d.po||[],   vi:  d.vi||[],   vo:  d.vo||[],
-    ph: d.ph||zeros(PED_HOURS.length),  pho: d.pho||zeros(PED_HOURS.length),
-    vh: d.vh||zeros(VEH_HOURS.length),  vho: d.vho||zeros(VEH_HOURS.length),
-    gpi: d.gpi||[], gpo: d.gpo||[], gvi: d.gvi||[], gvo: d.gvo||[],
+    /* (v4.5) ทำข้อมูลดิบให้เป็นรูปแบบเดียวก่อนใช้เสมอ — ดู cleanGateBlock / hourRow ด้านล่าง
+       เดิมรับค่าจากหลังบ้านตรง ๆ: ชื่อประตูที่เป็นค่าว่างขึ้นจอเป็นคำว่า "null"/"undefined"
+       ตัวเลขที่มาเป็นข้อความ ("1,000") ถูก "ต่อสตริง" แทนการบวก และแถวรายชั่วโมง
+       ที่ยาวไม่เท่าจำนวนชั่วโมง ทำให้กราฟเลื่อนช่องหรือขึ้น NaN */
+    ph:  hourRow(d.ph,  PED_HOURS.length), pho: hourRow(d.pho, PED_HOURS.length),
+    vh:  hourRow(d.vh,  VEH_HOURS.length), vho: hourRow(d.vho, VEH_HOURS.length),
     chk: d.chk||[],
     s: {
       custIn:  num(s.custIn),  custOut: num(s.custOut),
@@ -3137,6 +3150,10 @@ function enrichDay(d, iso){
       moto:    num(s.moto),    taxi:    num(s.taxi),   deli: num(s.deli)
     }
   };
+  cleanGateBlock(o, d, 'pn',  'pi', 'gpi', 'ประตูไม่ระบุชื่อ',   PED_HOURS.length);
+  cleanGateBlock(o, d, 'pno', 'po', 'gpo', 'ประตูไม่ระบุชื่อ',   PED_HOURS.length);
+  cleanGateBlock(o, d, 'vni', 'vi', 'gvi', 'ช่องทางไม่ระบุชื่อ', VEH_HOURS.length);
+  cleanGateBlock(o, d, 'vno', 'vo', 'gvo', 'ช่องทางไม่ระบุชื่อ', VEH_HOURS.length);
   o.pk  = o.pn.map(gateKey);
   o.pok = o.pno.map(gateKey);
   o.vik = o.vni.map(gateKey);
@@ -3168,7 +3185,49 @@ function enrichDay(d, iso){
   o.sumMissing = !o.blank && !(o.s.custIn>0 || o.s.custOut>0 || o.s.carIn>0 || o.s.carOut>0);
   return o;
 }
-function num(v){ return Number.isFinite(v) ? v : 0; }
+/* (v4.5) แปลงค่าจากไฟล์เป็นตัวเลขอย่างปลอดภัย
+   · ตัวเลขปกติ → ใช้เลย · ข้อความตัวเลข ("12,345" / " 80 ") → แปลงให้ (Excel ที่จัดรูปแบบเป็นข้อความพบบ่อย)
+   · อย่างอื่นทั้งหมด (ว่าง, null, NaN, Infinity, ตัวอักษร) → 0
+   เดิมข้อความตัวเลขถูกนับเป็น 0 เงียบ ๆ ยอดของวันนั้นจึงหายไปทั้งช่องโดยไม่มีอะไรเตือน */
+function num(v){
+  if(typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  if(typeof v === 'string'){
+    var t = v.replace(/[,\s]/g, '');
+    if(/^-?\d+(\.\d+)?$/.test(t)) return parseFloat(t);
+  }
+  return 0;
+}
+/* แถวรายชั่วโมง: ต้องยาวเท่าจำนวนชั่วโมงเป๊ะ — สั้นเติม 0 ยาวตัดทิ้ง ค่าทุกช่องเป็นตัวเลข */
+function hourRow(a, n){
+  var out = zeros(n);
+  if(a && typeof a.length === 'number') for(var i=0;i<n && i<a.length;i++) out[i] = num(a[i]);
+  return out;
+}
+/* ชื่อ + ยอด + ยอดรายชั่วโมง ของประตู/ช่องทางหนึ่งชุด ให้ยาวเท่ากันและชนิดถูกต้อง
+   ประตูที่ไม่มีชื่อแต่มียอด "ต้องเก็บยอดไว้" ภายใต้ชื่อกลาง ไม่ใช่ทิ้ง — ทิ้งแล้วผลรวมรายประตู
+   จะไม่เท่ายอดรวมของวัน และหน้าคุณภาพข้อมูลจะแจ้งผิดว่าไฟล์รวมยอดไม่ตรง */
+function cleanGateBlock(o, d, nK, vK, hK, fallbackName, hours){
+  var names = (d[nK] && typeof d[nK].length === 'number') ? d[nK] : [];
+  var vals  = (d[vK] && typeof d[vK].length === 'number') ? d[vK] : [];
+  var hrs   = (d[hK] && typeof d[hK].length === 'number') ? d[hK] : [];
+  var n = Math.max(names.length, vals.length), N = [], V = [], H = [];
+  for(var i=0;i<n;i++){
+    var nm = names[i];
+    nm = (typeof nm === 'string' || typeof nm === 'number') ? String(nm).trim() : '';
+    var v = num(vals[i]);
+    if(!nm && !v) continue;                       // ไม่มีทั้งชื่อและยอด = แถวว่างในไฟล์ ข้ามได้
+    N.push(nm || fallbackName); V.push(v);
+    H.push(hrs[i] && typeof hrs[i].length === 'number' ? hourRow(hrs[i], hours) : undefined);
+  }
+  o[nK] = N; o[vK] = V;
+  o[hK] = hrs.length ? H : [];
+}
+function fmtStamp(v){
+  /* เวลาแก้ไขไฟล์จากหลังบ้านอาจว่างหรือผิดรูปแบบ — เดิมขึ้นจอว่า "Invalid Date" */
+  if(v === null || v === undefined || v === '') return '—';
+  var t = new Date(v);
+  return isNaN(t.getTime()) ? '—' : t.toLocaleString('th-TH');
+}
 
 /* ยุบรายการประตูที่คีย์ซ้ำกันภายในวันเดียว: บวกยอด บวกยอดรายชั่วโมงทีละช่อง
    และต่อชื่อดิบไว้ด้วย " + " เพื่อให้หน้าคุณภาพข้อมูลยังบอกได้ว่ารวมมาจากประตูไหนบ้าง */
@@ -3509,8 +3568,25 @@ function filteredDays(){
    ถ้าช่วงที่เลือกเริ่มวันที่ 1 ของเดือน (ซึ่งเป็นค่าเริ่มต้น) ให้เทียบกับ
    "ช่วงวันเดียวกันของเดือนก่อน" เช่น 1–16 ส.ค. เทียบ 1–16 ก.ค.
    ไม่ใช่ 16–31 ก.ค. แบบนับถอยหลังตามจำนวนวัน ซึ่งอ่านแล้วสับสนสำหรับรายงานรายเดือน */
+/* (v4.5) วันสุดท้ายของช่วง "ที่มีข้อมูลคีย์แล้วจริง"
+   ตัวเลือก "เดือนนี้" ตั้งช่วงเป็น 1–30 ก.ย. เสมอ แม้ข้อมูลจะคีย์ถึงแค่วันที่ 27
+   ถ้าเอาช่วงเต็มไปหาช่วงเทียบ จะได้ "27 วันแรกของ ก.ย." เทียบ "ทั้งเดือน ส.ค. 31 วัน"
+   ซึ่งไม่ใช่การเทียบแบบเดียวกัน (ปลายเดือนมักมียอดต่างจากต้นเดือน เช่นช่วงเงินเดือนออก)
+   จึงตัดปลายช่วงให้จบที่วันล่าสุดที่คีย์แล้ว → เทียบ 1–27 ก.ย. กับ 1–27 ส.ค. */
+function keyedEnd(from, to){
+  if(!isIso(from) || !isIso(to) || from > to) return to;
+  var days = DATA.days;
+  for(var i=days.length-1;i>=0;i--){
+    var d = days[i];
+    if(d.d > to) continue;
+    if(d.d < from) break;
+    if(!d.blank) return d.d;
+  }
+  return to;      // ทั้งช่วงยังไม่มีข้อมูล — คงช่วงเดิม ให้หน้าที่เรียกแสดง "ไม่มีข้อมูล" ตามปกติ
+}
 function previousRange(from, to){
   if(!isIso(from) || !isIso(to) || from > to) return null;
+  to = keyedEnd(from, to);
   /* ต้องอยู่ในเดือนเดียวกันด้วย ไม่ใช่แค่เริ่มวันที่ 1
      ไม่งั้นช่วง "3 เดือนล่าสุด" (1 มิ.ย.–10 ส.ค.) จะถูกเทียบกับ 1–10 พ.ค.
      ซึ่งสั้นกว่าของจริง 3 เท่า แล้วตัวเลข % จะผิดมหาศาล */
@@ -6272,6 +6348,7 @@ function renderCompare(){
      ไม่งั้น addDays/daysBetween จะได้ค่าจากสตริงว่างแล้วพังทั้งหน้า */
   var aFrom = isIso(f.from) ? f.from : DATA.days[0].d;
   var aTo   = isIso(f.to)   ? f.to   : DATA.days[DATA.days.length-1].d;
+  aTo = keyedEnd(aFrom, aTo);      // (v4.5) ช่วงที่เลือกจบที่วันล่าสุดที่คีย์แล้ว — ดูเหตุผลที่ keyedEnd()
   var len = daysBetween(aFrom, aTo) + 1;
   var bFrom, bTo, modeLabel;
 
@@ -8636,7 +8713,7 @@ function renderQuality(){
             return '<tr><td style="text-align:left">'+esc(f.name)+'</td>'
               + '<td style="text-align:left">'+esc(f.kind)+'</td>'
               + '<td class="num">'+(n||'—')+'</td>'
-              + '<td style="text-align:left"><span class="hint">'+esc(new Date(f.mtime).toLocaleString('th-TH'))+'</span></td>'
+              + '<td style="text-align:left"><span class="hint">'+esc(fmtStamp(f.mtime))+'</span></td>'
               + '<td style="text-align:left">'+(f.skip
                   ? '<span class="chip chip-dn">'+esc(f.skip)+'</span>'
                   : (n? '<span class="chip chip-up">อ่านแล้ว</span>' : '<span class="chip chip-w">ยังไม่พบข้อมูลรายวัน</span>'))+'</td></tr>';
@@ -8804,7 +8881,7 @@ function renderSettings(){
               return '<tr><td style="text-align:left">'+esc(f.name)+'</td>'
                 + '<td style="text-align:left">'+esc(f.kind)+'</td>'
                 + '<td class="num">'+(f.size? Math.round(f.size/1024).toLocaleString('th-TH')+' KB' : '—')+'</td>'
-                + '<td style="text-align:left"><span class="hint">'+esc(new Date(f.mtime).toLocaleString('th-TH'))+'</span></td>'
+                + '<td style="text-align:left"><span class="hint">'+esc(fmtStamp(f.mtime))+'</span></td>'
                 + '<td style="text-align:left">'+(f.cached?'<span class="chip chip-up">มีแคช</span>':'<span class="chip chip-0">ยังไม่มี</span>')+'</td></tr>';
             }).join('')
           + '</tbody></table></div>'
@@ -9073,7 +9150,7 @@ function bindSettings(){
       box.innerHTML =
           '<b style="color:var(--ok)">✓ ตรวจเสร็จแล้ว</b><br>'
         + 'ไฟล์ล่าสุด: <b>'+esc(fr.name)+'</b><br>'
-        + 'แก้ไขล่าสุด: '+esc(new Date(latest.mtime).toLocaleString('th-TH'))+'<br><br>'
+        + 'แก้ไขล่าสุด: '+esc(fmtStamp(latest.mtime))+'<br><br>'
         + 'เซิร์ฟเวอร์อ่านได้: <b>'+fmt(srvDays.length)+' วัน</b>'
         + (srvDays.length? ' ('+thDate(srvDays[0],'medium')+' – '+thDate(srvDays[srvDays.length-1],'medium')+')' : '')+'<br>'
         + 'มีในเครื่องตอนนี้: <b>'+fmt(localDays.length)+' วัน</b><br><br>'
@@ -9611,9 +9688,15 @@ function buildReportPages(days){
 
   /* เลขหน้าแบบ "หน้า x / ทั้งหมด" และเลขที่รายงาน — แทนค่าตอนท้าย
      เพราะตอนสร้างแต่ละหน้ายังไม่รู้จำนวนหน้าทั้งหมด */
+  /* (v4.5) ระบุ "ช่วงที่นำมาเทียบ" ไว้ที่หัวกระดาษทุกหน้า — เดิมการ์ดเขียนแค่ "เทียบช่วงก่อน"
+     ผู้อ่านรายงานไม่มีทางรู้ว่า % ที่เห็นเทียบกับวันที่เท่าไหร่ถึงเท่าไหร่ */
+  var cmpR = previousRange(rf, rt);
+  var cmpNote = (cmpR && prev && prev.n)
+    ? ' · ช่วงเทียบ ' + esc(thDate(cmpR.from,'medium')) + ' – ' + esc(thDate(cmpR.to,'medium')) + ' (' + fmt(prev.n) + ' วัน)'
+    : ' · ไม่มีข้อมูลช่วงเทียบ';
   var pages = [p1, p2, p3, p4, p5];
   return pages.map(function(pg){
-    return pg.split('{{TOTAL}}').join(String(pages.length)).split('{{DOCNO}}').join(esc(docNo));
+    return pg.split('{{TOTAL}}').join(String(pages.length)).split('{{DOCNO}}').join(esc(docNo)).split('{{CMP}}').join(cmpNote);
   });
 }
 
@@ -9625,7 +9708,7 @@ function a4Page(title, period, body, pageNo){
     +   '<img src="'+LOGO_LIGHT+'" style="height:42px;width:auto;flex:0 0 auto" alt="Seacon Bangkae">'
     +   '<div style="flex:1;min-width:0;border-left:1px solid #f0dbd1;padding-left:16px">'
     +     '<div style="font-size:18px;font-weight:800;line-height:1.35;color:#11241C">'+esc(title)+'</div>'
-    +     '<div style="font-size:10.5px;color:#54685C">ฝ่ายบริการทั่วไป · ศูนย์การค้าซีคอนบางแค · ช่วงข้อมูล '+esc(period)+'</div>'
+    +     '<div style="font-size:10.5px;color:#54685C">ฝ่ายบริการทั่วไป · ศูนย์การค้าซีคอนบางแค · ช่วงข้อมูล '+esc(period)+'{{CMP}}</div>'
     +   '</div>'
     +   '<div style="text-align:right;font-size:9.5px;color:#8A9A90;line-height:1.65;flex:0 0 auto">'
     +     'ออกรายงาน '+esc(thDate(isoOf(new Date()),'medium'))+'<br>'
@@ -9636,7 +9719,7 @@ function a4Page(title, period, body, pageNo){
     + body
     + '<div style="position:absolute;left:30px;right:30px;bottom:12px;display:flex;justify-content:space-between;'
     +   'font-size:9px;color:#8A9A90;border-top:1px solid #F5E0D6;padding-top:6px">'
-    +   '<span>เอกสารนี้สร้างอัตโนมัติจากข้อมูลในระบบ · ตัวเลขทั้งหมดอ้างอิงไฟล์ต้นทางใน Google Drive</span>'
+    +   '<span><b style="color:#54685C">เอกสารใช้ภายใน</b> · สร้างอัตโนมัติจากข้อมูลในระบบ · ตัวเลขทั้งหมดอ้างอิงไฟล์ต้นทางใน Google Drive</span>'
     +   '<span>หน้า '+pageNo+' / {{TOTAL}} · ศูนย์การค้าซีคอนบางแค</span></div>'
     + '</div>';
 }
@@ -11203,17 +11286,25 @@ function reportFatal(what, err){
   /* ปลดม่านต้องคืนสถานะ LOCKED ด้วย ไม่งั้นระบบพักหน้าจอจะตายถาวรทั้ง session
      (resetIdle และ lockScreen ต่างก็มี guard ว่า "ถ้า LOCKED อยู่ให้ออก")
      เคสจริง: ม่านขึ้นอยู่ → auto-sync เบื้องหลังพัง → ม่านหาย ข้อมูลโผล่ และล็อกอีกไม่ได้ */
+  /* (v4.5) ปลดเฉพาะ "หน้าอินโทร" ที่ค้าง — ถ้าเป็นม่านพักหน้าจอ (LOCKED) ต้องคงไว้
+     เดิมปลดทั้งสองกรณี: จอที่พักหน้าจออยู่ แล้วการซิงก์เบื้องหลังเกิด error
+     ม่านจะหายเอง ยอดลูกค้าโผล่ค้างบนจอโดยไม่มีใครอยู่หน้าเครื่อง ซึ่งผิดวัตถุประสงค์ของม่าน */
   var sp=$('splash');
-  if(sp){ sp.classList.remove('locked'); sp.classList.add('gone'); }
-  if(typeof LOCKED !== 'undefined' && LOCKED){
-    LOCKED = false;
-    try{ resetIdle(); }catch(e){}
-  }
+  if(sp && !(typeof LOCKED !== 'undefined' && LOCKED)){ sp.classList.remove('locked'); sp.classList.add('gone'); }
   if(FATAL_COUNT++ >= 3) return;
   var msg = (err && err.message) ? err.message : String(err||'ไม่ทราบสาเหตุ');
   toast('เกิดข้อผิดพลาดที่ไม่คาดคิด: '+msg+' — ถ้าหน้าจอผิดปกติ ให้กดโหลดข้อมูลใหม่ หรือรีเฟรชหน้าเว็บ','err',12000);
 }
-window.addEventListener('error', function(ev){ reportFatal('window error', ev.error||ev.message); });
+window.addEventListener('error', function(ev){
+  /* error จากสคริปต์ของหลังบ้าน (JSONP ที่ได้หน้า HTML กลับมา) มีตัวจัดการของตัวเองใน API แล้ว
+     ไม่ต้องเด้งข้อความ "Unexpected token <" ซ้ำให้ผู้ใช้งง */
+  var src = String((ev && ev.filename) || '');
+  if(/script\.google(usercontent)?\.com/.test(src)) return;
+  /* สคริปต์ข้ามโดเมนถูกเบราว์เซอร์ปิดรายละเอียด เหลือแค่ "Script error." ไม่มีชื่อไฟล์
+     ในแอปนี้มีเพียง JSONP ของหลังบ้านที่เข้าข่าย ซึ่งรายงานผ่าน API แล้วเช่นกัน */
+  if(!src && !ev.error && /^Script error\.?$/.test(String(ev.message||''))) return;
+  reportFatal('window error', ev.error||ev.message);
+});
 window.addEventListener('unhandledrejection', function(ev){ reportFatal('promise rejection', ev.reason); });
 
 /* วาดกราฟซ้ำเมื่อ CDN โหลดเสร็จ — กันกรณี DOM พร้อมก่อนไลบรารีมาถึง
