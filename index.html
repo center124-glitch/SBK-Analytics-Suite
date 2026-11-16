@@ -1770,7 +1770,7 @@ table.tbl th[aria-sort="descending"]::after{ content:'\25BC'; opacity:1; color:v
    ส่วนที่ 1 · ค่าคงที่ และเครื่องมือพื้นฐาน
 ============================================================================ */
 
-var APP_VERSION = '4.5';
+var APP_VERSION = '4.6';
 
 /* โลโก้ Seacon Bangkae ฝังเป็น data URL — ไฟล์เดียวจบ ไม่ต้องแนบรูปแยก
    มี 2 ชุด: ชุดสีเดิมสำหรับพื้นสว่าง/รายงาน และชุดตัวอักษรสีขาวสำหรับพื้นมืด */
@@ -2605,6 +2605,8 @@ var DB = (function(){
      · JSONP  — ใช้เมื่อเปิดไฟล์จากเครื่อง (file://) ซึ่ง fetch จะโดน CORS บล็อก
    โหมด auto = ลอง fetch ก่อน ถ้าพังค่อยถอยไป JSONP
 ============================================================================ */
+var PREVIEW_MSG = 'กำลังเปิดไฟล์ในหน้าพรีวิว ซึ่งไม่อนุญาตให้เชื่อมต่อระบบหลังบ้าน '
+  + '— กรุณาดาวน์โหลดไฟล์ แล้วเปิดด้วย Google Chrome หรือ Microsoft Edge โดยตรง (ข้อมูลและ URL ในหน้าตั้งค่าไม่ต้องแก้ไข)';
 var API = (function(){
   var seq = 0;
 
@@ -2753,7 +2755,12 @@ var API = (function(){
   /* ห่อให้ error ฝั่ง server (ok:false) โยนเป็น exception เหมือนกัน
      จะได้จับที่เดียวและแสดงข้อความภาษาไทยแบบเดียวกันทุกจุด */
   function ask(params, timeoutMs){
-    return call(params, timeoutMs).then(function(r){
+    return call(params, timeoutMs).catch(function(e){
+      /* (v4.6) ในหน้าพรีวิวไฟล์ เบราว์เซอร์บล็อกการเชื่อมต่อออกนอกหน้า
+         สาเหตุจึงไม่ใช่ URL หรือ Code.gs — บอกวิธีแก้ที่ถูกต้องแทน */
+      if(isPreviewEnv()) throw new Error(PREVIEW_MSG);
+      throw e;
+    }).then(function(r){
       if(!r || typeof r!=='object') throw new Error('ระบบหลังบ้านตอบกลับข้อมูลที่อ่านไม่ได้');
       if(r.ok===false) throw new Error(r.error || 'ระบบหลังบ้านแจ้งข้อผิดพลาดที่ไม่ระบุสาเหตุ');
       return r;
@@ -3007,7 +3014,9 @@ async function loadData(force, quiet){
     }
 
   }catch(err){
-    console.error(err);
+    /* (v4.6) แจ้งผู้ใช้ผ่าน toast/แถบสถานะแล้ว — ใช้ console.warn
+       เพื่อไม่ให้หน้าพรีวิว/เครื่องมือตรวจจับนับเป็นข้อผิดพลาดร้ายแรงซ้ำซ้อน */
+    console.warn('โหลดข้อมูลไม่สำเร็จ:', err && err.message || err);
     /* โหมดเงียบที่มีข้อมูลเก่าอยู่แล้ว ไม่ควรเด้ง error ขวางหน้า
        ผู้ใช้เปิดโปรแกรมมาเพื่อดูข้อมูล ไม่ใช่มาแก้เน็ต — ข้อมูลเดิมยังใช้ได้อยู่
        แค่บอกไว้เบา ๆ ว่าที่เห็นคือข้อมูลเดิม แล้วให้กดโหลดเองถ้าต้องการ */
@@ -9635,24 +9644,16 @@ function buildReportPages(days){
           + '</div></div>')
     + '</div>', 4);
 
-  /* --------- หน้า 5: นิยามตัวชี้วัด วิธีคำนวณ และการรับรองรายงาน (v4.0) ---------
+  /* --------- หน้า 5: นิยามตัวชี้วัด วิธีคำนวณ และขอบเขตข้อมูล ---------
      รายงานที่ส่งผู้บริหารต้อง "ตรวจย้อนได้" — ผู้อ่านคนละคนต้องตีความตัวเลขตรงกัน
-     และมีผู้รับผิดชอบลงนาม ตามมาตรฐานเอกสารราชการ/องค์กร
+     (v4.6) ตัดส่วน "การรับรองรายงาน" (ช่องลงชื่อผู้จัดทำ/ผู้ตรวจสอบ/ผู้อนุมัติ) ออกตามที่ผู้ใช้กำหนด
      แยกเป็นหน้าของตัวเองแทนการแทรกท้ายหน้า 4 เพราะหน้า 4 เต็มพื้นที่แล้ว
      การอัดเพิ่มจะล้นขอบ A4 ตอนส่งออก PDF */
   function defRow(t, d){
     return '<tr><td style="padding:5px 8px;border-bottom:1px solid #F5E0D6;font-weight:700;white-space:nowrap;vertical-align:top">'+t+'</td>'
          + '<td style="padding:5px 8px;border-bottom:1px solid #F5E0D6;color:#34463C">'+d+'</td></tr>';
   }
-  function sign(role){
-    return '<div style="text-align:center;font-size:10.5px;line-height:1.9">'
-         + '<div style="height:44px"></div>'
-         + '<div>ลงชื่อ ........................................................</div>'
-         + '<div>( ........................................................ )</div>'
-         + '<div>ตำแหน่ง ....................................................</div>'
-         + '<div><b>'+role+'</b> · วันที่ ....... / ....... / ...........</div></div>';
-  }
-  var p5 = a4Page('นิยามตัวชี้วัด วิธีคำนวณ และการรับรองรายงาน', period,
+  var p5 = a4Page('นิยามตัวชี้วัด วิธีคำนวณ และขอบเขตข้อมูล', period,
       '<div style="display:grid;grid-template-columns:1.35fr 1fr;gap:14px">'
     +   a4Box('นิยามและวิธีคำนวณ',
           '<table style="width:100%;border-collapse:collapse;font-size:9.5px;line-height:1.6">'
@@ -9677,12 +9678,6 @@ function buildReportPages(days){
           + '<div>แหล่งข้อมูล ไฟล์รายงานยอดประจำวันใน Google Drive ('+fmt((DATA.files||[]).length)+' ไฟล์)</div>'
           + '<div>ออกรายงานเมื่อ '+esc(thDate(isoOf(new Date()),'long'))+' เวลา '
           +   esc(String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0'))+' น.</div>'
-          + '</div>')
-    + '</div>'
-    + '<div style="margin-top:16px">'
-    +   a4Box('การรับรองรายงาน',
-          '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'
-          + sign('ผู้จัดทำ') + sign('ผู้ตรวจสอบ') + sign('ผู้อนุมัติ')
           + '</div>')
     + '</div>', 5);
 
@@ -10353,6 +10348,32 @@ function probeIcon(url){
 /* URL เต็มของไอคอนที่ระบบพยายามโหลด — เก็บไว้ให้หน้าตั้งค่าเอาไปแสดง */
 var ICON_URL_TRIED = '';
 
+/* (v4.6) แปลงชื่อไฟล์เป็น URL เต็มแบบปลอดภัย
+   เหตุที่ต้องมี: เมื่อเปิดไฟล์ในหน้าพรีวิว/iframe แบบ srcdoc ค่า location.href คือ "about:srcdoc"
+   ซึ่งใช้เป็นฐานของ new URL() ไม่ได้ → โยน TypeError "Failed to construct 'URL': Invalid URL"
+   และเพราะอยู่ใน async function จึงหลุดออกมาเป็น unhandled promise rejection
+   คืนค่าว่างแทนการโยน error — ไม่มีไอคอนภายนอกก็ใช้ไอคอนที่ฝังไว้ในไฟล์ได้ตามปกติ */
+function absUrl(rel){
+  try{ return new URL(rel, location.href).href; }catch(e){ return ''; }
+}
+
+/* (v4.6) เปิดจากที่ที่มี "ที่อยู่จริง" หรือไม่ (http/https/file)
+   หน้าพรีวิวไฟล์ (about:srcdoc · blob: · data:) ไม่มีโฟลเดอร์ข้าง ๆ ให้ไล่หาไอคอน
+   และมักถูกจำกัดการเชื่อมต่อเครือข่าย */
+function hasRealLocation(){
+  return /^(https?|file):$/.test(location.protocol);
+}
+
+/* (v4.6) ตรวจว่ากำลังเปิดอยู่ใน "หน้าพรีวิว" ที่ถูกจำกัดสิทธิ์หรือไม่
+   ใช้ตัดสินใจไม่ยิงโหลดข้อมูลอัตโนมัติ และแสดงคำแนะนำที่ถูกต้อง
+   แทนข้อความ "เชื่อมต่อระบบหลังบ้านไม่ได้" ที่ชี้ผู้ใช้ไปตรวจ URL ผิดจุด */
+function isPreviewEnv(){
+  if(!hasRealLocation()) return true;
+  var sandboxed = false;
+  try{ sandboxed = (window.origin === 'null') && location.protocol !== 'file:'; }catch(e){}
+  return sandboxed;
+}
+
 function customIconUrl(){
   var u = String(CFG.iconUrl || '').trim();
   return /^https:\/\//.test(u) ? u : '';
@@ -10428,28 +10449,28 @@ async function setupIcons(){
   /* ---- 2. ไฟล์ .png จริงที่วางไว้บนเซิร์ฟเวอร์ ----
      ไล่ทีละชื่อ เพราะผู้ใช้แต่ละคนอัปโหลดไว้คนละชื่อ
      ไม่เจอก็ไม่เป็นไร — ของที่ฝังไว้ใน head ทำงานอยู่แล้ว */
+  if(!hasRealLocation()){ ICON_URL_TRIED = ''; return; }
   for(var i=0; i<ICON_CANDIDATES.length; i++){
-    var cand = ICON_CANDIDATES[i], abs;
-    try{ abs = new URL(cand, location.href).href; }catch(e){ continue; }
+    var cand = ICON_CANDIDATES[i], abs = absUrl(cand);
+    if(!abs) continue;
     if(await probeIcon(cand)){
       ICON_URL_TRIED = abs;
       ICONS_EXTERNAL = true; ICON_MODE = 'files';
-      var f32 = (await probeIcon('sbk-icon-32.png'))
-                  ? new URL('sbk-icon-32.png', location.href).href : '';
+      var f32 = (await probeIcon('sbk-icon-32.png')) ? absUrl('sbk-icon-32.png') : '';
       upgradeIconLinks(abs, f32);
       buildManifestBlob(await bestManifestIcon_(abs));
       return;
     }
   }
 
-  ICON_URL_TRIED = new URL(ICON_CANDIDATES[0], location.href).href;
+  ICON_URL_TRIED = absUrl(ICON_CANDIDATES[0]);
   /* ไม่เจอไฟล์จริง = คงลิงก์ data: ที่ฝังไว้ตามเดิม ไม่ต้องทำอะไรทั้งนั้น */
 }
 
 /* manifest อยากได้รูป 192 ขึ้นไป — ถ้ามีไฟล์ 192 จริงก็ใช้ ไม่มีก็ใช้ตัวที่เจอ */
 async function bestManifestIcon_(fallback){
   return (await probeIcon('sbk-icon-192.png'))
-    ? new URL('sbk-icon-192.png', location.href).href : fallback;
+    ? (absUrl('sbk-icon-192.png') || fallback) : fallback;
 }
 
 /* ประกอบ manifest ขึ้นตอนรันไทม์ แล้วแปลงเป็น Blob URL
@@ -10732,8 +10753,9 @@ function runSplashProgress(){
 
 function initShell(){
   /* ตรวจไฟล์ไอคอนแบบไม่บล็อก — ไม่ต้องรอผลก่อนแสดงหน้าจอ
-     เพราะถ้ารอ แล้วไฟล์ไม่มี จะหน่วงการเปิดแอปไปอีก 3 วินาทีโดยไม่จำเป็น */
-  setupIcons();
+     เพราะถ้ารอ แล้วไฟล์ไม่มี จะหน่วงการเปิดแอปไปอีก 3 วินาทีโดยไม่จำเป็น
+     (v4.6) ต้องมี .catch เสมอ — เดิมเรียกแบบไม่รอผล error ข้างในจึงกลายเป็น unhandled rejection */
+  setupIcons().catch(function(e){ console.warn('ตรวจไอคอนไม่สำเร็จ (ใช้ไอคอนที่ฝังไว้แทน)', e); });
 
   initSecNav();
 
@@ -11267,6 +11289,13 @@ async function boot(){
         มีไฟล์ไหนถูกแก้หรือเพิ่มเข้ามาบ้าง ถ้ามีจึงดึงเฉพาะไฟล์นั้น
         ระบบเทียบด้วย mtime ของไฟล์ ถ้าไม่มีอะไรเปลี่ยนจะไม่ดาวน์โหลดอะไรเลย
         จึงเสียแค่ 1 คำขอเบา ๆ ไม่กระทบความเร็วในการเปิด */
+  /* (v4.6) หน้าพรีวิวไฟล์เชื่อมต่อหลังบ้านไม่ได้ — ไม่ยิงโหลดอัตโนมัติให้เกิด error ทุกครั้งที่เปิด
+     แจ้งวิธีเปิดที่ถูกต้องแทน ผู้ใช้ยังกด "โหลดข้อมูล" เองได้ถ้าต้องการทดลอง */
+  if(isPreviewEnv()){
+    setStatus('โหมดพรีวิว — เปิดไฟล์ใน Chrome/Edge เพื่อโหลดข้อมูล','warn');
+    setTimeout(function(){ toast(PREVIEW_MSG, 'info', 12000); }, 900);
+    return;
+  }
   if(CFG.autoLoad && CFG.url){
     if(!DATA.days.length){
       setTimeout(function(){ loadData(false); }, 350);
